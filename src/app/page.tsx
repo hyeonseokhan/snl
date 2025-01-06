@@ -1,3 +1,9 @@
+import { Flex, Text } from '@radix-ui/themes';
+
 export default function Page() {
-  return <div>Hello World</div>;
+  return (
+    <Flex>
+      <Text>Hello World</Text>
+    </Flex>
+  );
 }

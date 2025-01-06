@@ -1,7 +1,11 @@
 import type { NextConfig } from 'next';
 
+const basePath = '/snl';
 const nextConfig: NextConfig = {
-  /* config options here */
+  basePath,
+  env: {
+    BASE_PATH: basePath,
+  },
 };
 
 export default nextConfig;
