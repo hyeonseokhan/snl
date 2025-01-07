@@ -1,9 +1,9 @@
 import { Flex, Text } from '@radix-ui/themes';
 
-export default function Page() {
+export default function Contents() {
   return (
     <Flex>
-      <Text>Hello World</Text>
+      <Text>콘텐츠 페이지 입니다.</Text>
     </Flex>
   );
 }

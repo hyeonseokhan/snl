@@ -1,8 +1,11 @@
+import * as React from 'react';
 import type { Metadata } from 'next';
-import { NextThemeProvider } from '@/app/next-theme-provider';
-import { SiteConfig } from '@/config/global';
+import { SiteConfig } from '../config/global';
+import { Theme, ThemePanel } from '@radix-ui/themes';
+import { NextThemeProvider } from './next-theme-provider';
 import '@radix-ui/themes/styles.css';
-import { ThemeToggle } from '@/app/test';
+import './globals.css';
+import TopNavBar from '../components/TopNavBar';
 
 export const metadata: Metadata = {
   title: {
@@ -21,21 +24,13 @@ export default function RootLayout({
     <html lang="ko" suppressHydrationWarning>
       <body>
         <NextThemeProvider>
-          {/*<Theme asChild>*/}
-          {/*  <div id="root">*/}
-          {/*<ThemeTogglePanel />*/}
-          {/*<Flex*/}
-          {/*  height="100vh"*/}
-          {/*  width="100vw"*/}
-          {/*  align="center"*/}
-          {/*  justify="center"*/}
-          {/*>*/}
-          {/*  <ThemeToggle />*/}
-          {/*</Flex>*/}
-          <ThemeToggle />
-          {children}
-          {/*</div>*/}
-          {/*</Theme>*/}
+          <Theme asChild appearance="dark" accentColor="amber" radius="medium">
+            <div id="root">
+              <ThemePanel /> {/*NOTE check to use*/}
+              <TopNavBar />
+              {children}
+            </div>
+          </Theme>
         </NextThemeProvider>
       </body>
     </html>
