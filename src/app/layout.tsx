@@ -26,7 +26,7 @@ export default function RootLayout({
         <NextThemeProvider>
           <Theme asChild appearance="dark" accentColor="amber" radius="medium">
             <div id="root">
-              <ThemePanel /> {/*NOTE check to use*/}
+              <ThemePanel defaultOpen={false} /> {/*NOTE check to use*/}
               <TopNavBar />
               {children}
             </div>
