@@ -1,7 +1,7 @@
 import * as React from 'react';
 import type { Metadata } from 'next';
 import { SiteConfig } from '../config/global';
-import { Theme, ThemePanel } from '@radix-ui/themes';
+import { Theme } from '@radix-ui/themes';
 import { NextThemeProvider } from './next-theme-provider';
 import '@radix-ui/themes/styles.css';
 import './globals.css';
@@ -24,9 +24,8 @@ export default function RootLayout({
     <html lang="ko" suppressHydrationWarning>
       <body>
         <NextThemeProvider>
-          <Theme asChild appearance="dark" accentColor="amber" radius="medium">
+          <Theme asChild accentColor="amber" radius="medium">
             <div id="root">
-              <ThemePanel defaultOpen={false} /> {/*NOTE check to use*/}
               <TopNavBar />
               {children}
             </div>

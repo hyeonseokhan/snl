@@ -1,7 +1,8 @@
 'use client';
 
 import { AccessibleIcon } from '@radix-ui/react-accessible-icon';
-import { useThemeContext } from '@radix-ui/themes';
+import { useTheme } from 'next-themes';
+import { useEffect, useState } from 'react';
 
 export const DiscordIcon = () => {
   return (
@@ -12,8 +13,15 @@ export const DiscordIcon = () => {
 };
 
 const DiscordIconSVG = () => {
-  const theme = useThemeContext().appearance;
-  const fillColor = theme === 'light' ? '#000' : '#fff';
+  const { theme, systemTheme, setTheme } = useTheme();
+  const [fillColor, setFillColor] = useState('#000'); // 초기값 설정
+  useEffect(() => {
+    if (theme === 'light') {
+      setFillColor('#000');
+    } else {
+      setFillColor('#fff');
+    }
+  }, [theme]);
   return (
     <svg
       width="24"
