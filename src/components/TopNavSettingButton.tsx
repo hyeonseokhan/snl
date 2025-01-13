@@ -13,7 +13,7 @@ export default function TopNavSettingButton() {
           <TreeDotVerticalIcon />
         </Button>
       </DropdownMenu.Trigger>
-      <DropdownMenu.Content size="2">
+      <DropdownMenu.Content size="2" className="w-60">
         <ThemeToggleItem />
       </DropdownMenu.Content>
     </DropdownMenu.Root>
@@ -30,7 +30,7 @@ function ThemeToggleItem() {
   const Icon = theme === 'system' ? SunIcon : MoonIcon;
   const label = theme === 'system' ? '라이트모드 전환' : '다크모드 전환';
   return (
-    <DropdownMenu.Item shortcut="⌥ + T" onClick={toggleTheme}>
+    <DropdownMenu.Item onClick={toggleTheme}>
       <div className="flex items-center gap-x-2 py-1">
         <Icon />
         {label}

@@ -1,7 +1,6 @@
 import * as React from 'react';
 import type { Metadata } from 'next';
 import { SiteConfig } from '../config/global';
-import { Theme } from '@radix-ui/themes';
 import { NextThemeProvider } from './next-theme-provider';
 import '@radix-ui/themes/styles.css';
 import './globals.css';
@@ -24,12 +23,10 @@ export default function RootLayout({
     <html lang="ko" suppressHydrationWarning>
       <body>
         <NextThemeProvider>
-          <Theme asChild accentColor="amber" radius="medium">
-            <div id="root">
-              <TopNavBar />
-              {children}
-            </div>
-          </Theme>
+          <div id="root">
+            <TopNavBar />
+            {children}
+          </div>
         </NextThemeProvider>
       </body>
     </html>
