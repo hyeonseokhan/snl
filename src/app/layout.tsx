@@ -4,7 +4,7 @@ import { SiteConfig } from '../config/global';
 import { NextThemeProvider } from './next-theme-provider';
 import '@radix-ui/themes/styles.css';
 import './globals.css';
-import TopNavBar from '../components/TopNavBar';
+import { NavigationBar } from './navigation-bar';
 
 export const metadata: Metadata = {
   title: {
@@ -23,10 +23,7 @@ export default function RootLayout({
     <html lang="ko" suppressHydrationWarning>
       <body>
         <NextThemeProvider>
-          <div id="root">
-            <TopNavBar />
-            {children}
-          </div>
+          <NavigationBar>{children}</NavigationBar>
         </NextThemeProvider>
       </body>
     </html>

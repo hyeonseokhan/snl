@@ -289,12 +289,18 @@ const getBackgroundColorCss = ({
 .dark, .dark-theme, :is(.dark, .dark-theme) :where(.radix-themes:not(.light, .light-theme)) {
   --color-background: ${background};
 }
+html, body {
+  background-color: ${background};
+}
     `.trim();
   }
 
   return `
 :root, .light, .light-theme, .radix-themes {
   --color-background: ${background};
+}
+html, body {
+  background-color: ${background};
 }
   `.trim();
 };

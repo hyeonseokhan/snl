@@ -4,15 +4,11 @@ export const SiteConfig = {
   topNavItems: [
     {
       name: '내 숙제',
-      slug: 'todo',
+      slug: 'raid',
     },
     {
       name: '커뮤니티',
       slug: 'community',
-    },
-    {
-      name: '컨텐츠',
-      slug: 'contents',
     },
     {
       name: '도구모음',
