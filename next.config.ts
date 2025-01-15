@@ -6,6 +6,9 @@ const nextConfig: NextConfig = {
   env: {
     BASE_PATH: basePath,
   },
+  devIndicators: {
+    appIsrStatus: false,
+  },
 };
 
 export default nextConfig;

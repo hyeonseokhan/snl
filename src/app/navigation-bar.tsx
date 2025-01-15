@@ -1,6 +1,6 @@
 'use client';
 
-import { Flex, Grid, TabNav } from '@radix-ui/themes';
+import { Flex, TabNav } from '@radix-ui/themes';
 import TopNavSideBarButton from '../components/TopNavSideBarButton';
 import Logo from '../components/Logo';
 import { SiteConfig } from '../config/global';
@@ -8,17 +8,10 @@ import Link from 'next/link';
 import TopNavLoginButton from '../components/TopNavLoginButton';
 import TopNavSettingButton from '../components/TopNavSettingButton';
 import { usePathname } from 'next/navigation';
-import { RaidIcon } from '../components/icons/RaidIcon';
-import { PeopleIcon } from '../components/icons/PeopleIcon';
-import { HouseIcon } from '../components/icons/HouseIcon';
-import { CalculatorIcon } from '../components/icons/CalculatorIcon';
-import { HamburgerMenuIcon } from '../components/icons/HamburgerMenuIcon';
-import { useThemeColors } from '../components/UseThemeColors';
 import { FooterNav } from '../components/navigation/FooterNav';
 
 export function NavigationBar({ children }) {
   const pathname = usePathname();
-  const colors = useThemeColors();
   return (
     <Flex direction="column" width="100%">
       {/*상단 네비게이션 바*/}
@@ -27,6 +20,7 @@ export function NavigationBar({ children }) {
           <TopNavSideBarButton />
           <Logo />
           <TabNav.Root>
+            {/*https://www.radix-ui.com/primitives/docs/components/navigation-menu*/}
             {SiteConfig.topNavItems.map((item) => {
               return (
                 <TabNav.Link
