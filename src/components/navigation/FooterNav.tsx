@@ -1,6 +1,6 @@
 'use client';
 
-import { Box, Flex, Grid } from '@radix-ui/themes';
+import { Box, Flex, Grid, IconButton } from '@radix-ui/themes';
 import Link from 'next/link';
 import { RaidIcon } from '../icons/RaidIcon';
 import { PeopleIcon } from '../icons/PeopleIcon';
@@ -10,12 +10,15 @@ import { usePathname } from 'next/navigation';
 import { useThemeColors } from '../UseThemeColors';
 import { useEffect, useRef, useState } from 'react';
 import { HamburgerMenuIcon } from '../icons/HamburgerMenuIcon';
+import Logo from '../Logo';
+import { useThemeToggle } from '../hooks/theme-toggle';
 
 export function FooterNav() {
   const pathname = usePathname();
   const colors = useThemeColors();
   const [isOpen, setIsOpen] = useState(false);
   const target = useRef<HTMLDivElement>(null);
+  const { Icon, toggleTheme } = useThemeToggle();
   useEffect(() => {
     function handleClickOutside(event: MouseEvent | TouchEvent) {
       if (target.current && !target.current.contains(event.target as Node)) {
@@ -80,7 +83,7 @@ export function FooterNav() {
           />
           <div
             ref={target}
-            className={`fixed right-0 top-0 z-50 h-full w-64 transform text-white shadow-lg transition-transform duration-300 ${
+            className={`fixed right-0 top-0 z-50 h-full w-3/4 transform p-5 shadow-lg transition-transform duration-300 ${
               isOpen
                 ? 'translate-x-0 opacity-100'
                 : 'translate-x-full opacity-0'
@@ -90,11 +93,22 @@ export function FooterNav() {
               backgroundColor: colors.backgroundColor,
             }}
           >
-            <ul className="space-y-4 p-4">
-              <li>
-                <a href="">대시보드</a>
-              </li>
-            </ul>
+            <Flex direction="column" width="100%">
+              <Flex direction="column" gap="2" width="100%">
+                <Flex direction="row" justify="between" align="center">
+                  <Logo />
+                  <IconButton
+                    size="2"
+                    color="gray"
+                    variant="surface"
+                    onClick={toggleTheme}
+                  >
+                    <Icon />
+                  </IconButton>
+                </Flex>
+                <hr className="border-t-[0.5px] border-gray-400 px-1 opacity-30" />
+              </Flex>
+            </Flex>
           </div>
         </Box>
       </Grid>
