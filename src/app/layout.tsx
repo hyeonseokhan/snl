@@ -1,17 +1,18 @@
 import * as React from 'react';
+
 import type { Metadata } from 'next';
-import { SiteConfig } from '../config/global';
+import { siteConfig } from '../config/global';
 import { NextThemeProvider } from './next-theme-provider';
 import '@radix-ui/themes/styles.css';
 import './globals.css';
-import { NavigationBar } from './navigation-bar';
+import { Navigation } from './navigation';
 
 export const metadata: Metadata = {
   title: {
-    default: SiteConfig.name,
-    template: `%s - ${SiteConfig.name}`,
+    default: siteConfig.name,
+    template: `%s - ${siteConfig.name}`,
   },
-  description: SiteConfig.description,
+  description: siteConfig.description,
 };
 
 export default function RootLayout({
@@ -23,7 +24,7 @@ export default function RootLayout({
     <html lang="ko" suppressHydrationWarning>
       <body>
         <NextThemeProvider>
-          <NavigationBar>{children}</NavigationBar>
+          <Navigation>{children}</Navigation>
         </NextThemeProvider>
       </body>
     </html>

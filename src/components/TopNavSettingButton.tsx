@@ -2,10 +2,10 @@
 
 import { Button, DropdownMenu } from '@radix-ui/themes';
 import { TreeDotVerticalIcon } from './icons/TreeDotVertical';
-import { useThemeToggle } from './hooks/theme-toggle';
+import { useThemeToggle } from '../app/hooks/theme-toggle';
 
 export default function TopNavSettingButton() {
-  const { isDarkMode, toggleTheme, Icon, label } = useThemeToggle();
+  const { toggleTheme, Icon, label } = useThemeToggle();
 
   return (
     <DropdownMenu.Root>
