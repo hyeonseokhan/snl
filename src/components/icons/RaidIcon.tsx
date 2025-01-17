@@ -1,7 +1,4 @@
-'use client';
-
 import { AccessibleIcon } from '@radix-ui/react-accessible-icon';
-import { useThemeColors } from '../UseThemeColors';
 
 export const RaidIcon = ({ viewPage, target }) => {
   return (
@@ -12,7 +9,6 @@ export const RaidIcon = ({ viewPage, target }) => {
 };
 
 const RaidIconSVG = ({ isActive }) => {
-  const colors = useThemeColors();
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -20,15 +16,7 @@ const RaidIconSVG = ({ isActive }) => {
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
-      style={{
-        fill: isActive ? colors.activateColor : colors.deactivateColor,
-        stroke: isActive ? colors.activateColor : colors.deactivateColor,
-        height: '32px',
-        width: '32px',
-        transitionProperty: 'all',
-        transitionTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)',
-        transitionDuration: '150ms',
-      }}
+      className={`${isActive ? 'fill-[var(--gray-12)] stroke-[var(--gray-12)]' : 'fill-[var(--gray-10)] stroke-[var(--gray-10)]'} h-8 w-8 transition-all duration-150`}
     >
       <polyline points="14.5 17.5 3 6 3 3 6 3 17.5 14.5"></polyline>
       <line x1="13" x2="19" y1="19" y2="13"></line>
