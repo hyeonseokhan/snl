@@ -13,7 +13,7 @@ import LogoButton from '../LogoButton';
 import { useThemeToggle } from '../../app/hooks/theme-toggle';
 import SideBar from '../SideBar';
 
-export function MobileNavBar() {
+const MobileNavBar = () => {
   const pathname = usePathname();
   const colors = useThemeColors();
   const { Icon, toggleTheme } = useThemeToggle();
@@ -76,4 +76,6 @@ export function MobileNavBar() {
       </Grid>
     </div>
   );
-}
+};
+
+export default MobileNavBar;

@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { LogoIcon } from './icons/LogoIcon';
 
-export default function LogoButton() {
+const LogoButton = () => {
   return (
     <div className="mx-3 select-none">
       <Link href="/">
@@ -9,4 +9,6 @@ export default function LogoButton() {
       </Link>
     </div>
   );
-}
+};
+
+export default LogoButton;

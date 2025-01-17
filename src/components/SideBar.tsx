@@ -24,14 +24,14 @@ const SideBarButton: React.FC<{ children: React.ReactNode }> = ({
   if (!context)
     throw new Error('SideBarButton must be used within SideBarRoot');
   const { toggleSideBar } = context;
-
+  const colors = useThemeColors();
   return (
     <Flex
       align="center"
       py="2"
       justify="center"
       onClick={toggleSideBar}
-      style={{ cursor: 'pointer' }}
+      style={{ cursor: 'pointer', color: colors.activateColor }}
     >
       {children}
     </Flex>

@@ -1,11 +1,11 @@
 import * as React from 'react';
 
 import type { Metadata } from 'next';
-import { siteConfig } from '../config/global';
 import { NextThemeProvider } from './next-theme-provider';
+import { siteConfig } from '../config/global';
+import { Navigation } from './navigation';
 import '@radix-ui/themes/styles.css';
 import './globals.css';
-import { Navigation } from './navigation';
 
 export const metadata: Metadata = {
   title: {
