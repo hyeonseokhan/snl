@@ -7,7 +7,6 @@ import { RaidIcon } from '../icons/RaidIcon';
 import { PeopleIcon } from '../icons/PeopleIcon';
 import { HouseIcon } from '../icons/HouseIcon';
 import { CalculatorIcon } from '../icons/CalculatorIcon';
-import { useThemeColors } from '../UseThemeColors';
 import { HamburgerMenuIcon } from '../icons/HamburgerMenuIcon';
 import LogoButton from '../LogoButton';
 import { useThemeToggle } from '../../app/hooks/theme-toggle';
@@ -15,7 +14,6 @@ import SideBar from '../SideBar';
 
 const MobileNavBar = () => {
   const pathname = usePathname();
-  const colors = useThemeColors();
   const { Icon, toggleTheme } = useThemeToggle();
   return (
     <div className="fixed bottom-0 left-0 right-0 flex h-16 items-center justify-center md:hidden">
@@ -26,13 +24,11 @@ const MobileNavBar = () => {
         align="center"
         height="100%"
         px="2"
-        style={{
-          backgroundColor: colors.backgroundColor,
-        }}
+        className="bg-[var(--color-background)]"
       >
         <Flex align="center" py="2" justify="center">
-          <Link href="/raid">
-            <RaidIcon viewPage={pathname} target="/raid" />
+          <Link href="/todo">
+            <RaidIcon viewPage={pathname} target="/todo" />
           </Link>
         </Flex>
         <Flex align="center" py="2" justify="center">

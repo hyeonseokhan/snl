@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useRef, useState } from 'react';
 import { Box, Flex } from '@radix-ui/themes';
-import { useThemeColors } from './UseThemeColors';
 
 const SideBarContext = createContext<{
   isOpen: boolean;
@@ -24,14 +23,13 @@ const SideBarButton: React.FC<{ children: React.ReactNode }> = ({
   if (!context)
     throw new Error('SideBarButton must be used within SideBarRoot');
   const { toggleSideBar } = context;
-  const colors = useThemeColors();
   return (
     <Flex
       align="center"
       py="2"
       justify="center"
       onClick={toggleSideBar}
-      style={{ cursor: 'pointer', color: colors.activateColor }}
+      className="cursor-pointer text-[var(--gray-12)]"
     >
       {children}
     </Flex>
@@ -55,7 +53,6 @@ const SideBarContent: React.FC<SideBarContentProps> = ({
   const width = window.innerWidth <= 768 ? 'w-3/4' : 'w-64';
   const hidden = position === 'left' ? '-translate-x-full' : 'translate-x-full';
   const pos = position === 'left' ? 'left-0' : 'right-0';
-  const colors = useThemeColors();
   return (
     <>
       <div
@@ -66,13 +63,9 @@ const SideBarContent: React.FC<SideBarContentProps> = ({
       />
       <div
         ref={target}
-        className={`fixed ${pos} top-0 z-50 h-full ${width} transform p-5 shadow-lg transition-transform duration-300 ${
+        className={`fixed ${pos} top-0 z-50 h-full ${width} transform bg-[var(--color-background)] p-5 shadow-lg transition-all duration-300 ${
           isOpen ? 'opacity-100' : `${hidden} opacity-0`
         }`}
-        style={{
-          transitionProperty: 'transform, opacity',
-          backgroundColor: colors.backgroundColor,
-        }}
       >
         {children}
       </div>
