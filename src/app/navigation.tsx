@@ -9,7 +9,7 @@ export function Navigation({ children }) {
     <Flex direction="column" width="100%">
       <DesktopNavBar />
       <MobileNavBar />
-      <main className="bg-blue-600">{children}</main>
+      {children}
     </Flex>
   );
 }

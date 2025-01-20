@@ -29,13 +29,29 @@ export const links: Links = {
     href: '/tools',
     icon: CalculatorIcon,
   },
+  goldCalc: {
+    ko: '골드 구매 계산기',
+    en: 'gold-calc',
+    href: '/tools/gold-calc',
+    description: '골드 구매시 시세와 거래 수수료를 계산해 주는 도구',
+    isNew: false,
+  },
+  raidAuction: {
+    ko: '레이드 경매 계산기',
+    en: 'raid-auction',
+    description: '레이드 경매 보상에 대한 적절한 입찰금 계산 도구',
+    href: '/tools/raid-auction',
+    isNew: true,
+  },
 } as const;
 
-interface LinkItem {
+export interface LinkItem {
   ko: string;
   en: string;
   href: string;
-  icon: React.FC<{ viewPage: string; target: string }>;
+  isNew?: boolean;
+  description?: string;
+  icon?: React.FC<{ viewPage: string; target: string }>;
 }
 
 type Links = Record<string, LinkItem>;

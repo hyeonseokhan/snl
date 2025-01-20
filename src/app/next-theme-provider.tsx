@@ -15,11 +15,11 @@ export function NextThemeProvider({ children }) {
   );
   const [lightGrayValue, setLightGrayValue] = useLocalStorage(
     'colors/light/gray',
-    '#787982',
+    '#393b44',
   );
   const [lightBgValue, setLightBgValue] = useLocalStorage(
     'colors/light/background',
-    '#F6F3EF',
+    '#fafafa',
   );
   const [darkAccentValue, setDarkAccentValue] = useLocalStorage(
     'colors/dark/accent',
@@ -27,11 +27,11 @@ export function NextThemeProvider({ children }) {
   );
   const [darkGrayValue, setDarkGrayValue] = useLocalStorage(
     'colors/dark/gray',
-    '#8B8D98',
+    '#6b7280',
   );
   const [darkBgValue, setDarkBgValue] = useLocalStorage(
     'colors/dark/background',
-    '#212121',
+    '#141517',
   );
 
   const lightModeResult = generateRadixColors({

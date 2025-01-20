@@ -29,7 +29,7 @@ const MobileNavBar = () => {
           return (
             <Flex key={link.en} align="center" py="2" justify="center">
               <Link href={link.href}>
-                <Icon viewPage={pathname} target={link.href} />
+                {Icon ? <Icon viewPage={pathname} target={link.href} /> : null}
               </Link>
             </Flex>
           );
