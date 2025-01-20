@@ -3,7 +3,7 @@ import { AccessibleIcon } from '@radix-ui/react-accessible-icon';
 export const RaidIcon = ({ viewPage, target }) => {
   return (
     <AccessibleIcon label="RaidIcon">
-      <RaidIconSVG isActive={viewPage === target} />
+      <RaidIconSVG isActive={viewPage.includes(target)} />
     </AccessibleIcon>
   );
 };

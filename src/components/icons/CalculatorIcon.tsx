@@ -3,7 +3,7 @@ import { AccessibleIcon } from '@radix-ui/react-accessible-icon';
 export const CalculatorIcon = ({ viewPage, target }) => {
   return (
     <AccessibleIcon label="CalculatorIcon">
-      <CalculatorIconSVG isActive={viewPage === target} />
+      <CalculatorIconSVG isActive={viewPage.includes(target)} />
     </AccessibleIcon>
   );
 };
