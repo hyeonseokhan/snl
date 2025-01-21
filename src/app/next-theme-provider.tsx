@@ -11,7 +11,7 @@ export function NextThemeProvider({ children }) {
   const { resolvedTheme, setTheme } = useTheme();
   const [lightAccentValue, setLightAccentValue] = useLocalStorage(
     'colors/light/accent',
-    '#DD7C3C',
+    '#eb9100',
   );
   const [lightGrayValue, setLightGrayValue] = useLocalStorage(
     'colors/light/gray',
@@ -23,7 +23,7 @@ export function NextThemeProvider({ children }) {
   );
   const [darkAccentValue, setDarkAccentValue] = useLocalStorage(
     'colors/dark/accent',
-    '#DD7C3C',
+    '#f59e0b',
   );
   const [darkGrayValue, setDarkGrayValue] = useLocalStorage(
     'colors/dark/gray',

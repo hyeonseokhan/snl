@@ -31,7 +31,7 @@ const DesktopNavBar = () => {
               <Box
                 key={link.en}
                 asChild
-                className={`rounded-md px-3 py-2 transition-all duration-200 hover:bg-[var(--gray-5)] hover:bg-opacity-10 hover:text-[var(--gray-12)] ${pathname.includes(link.href) ? 'text-[var(--gray-12)]' : 'text-[var(--gray-10)]'}`}
+                className={`rounded-md px-3 py-2 hover:bg-[var(--gray-5)] hover:bg-opacity-10 hover:text-[var(--gray-12)] hover:transition-all hover:duration-200 ${pathname.includes(link.href) ? 'text-[var(--gray-12)]' : 'text-[var(--gray-10)]'}`}
               >
                 <Link href={link.href} className="font-bold">
                   {link.ko}

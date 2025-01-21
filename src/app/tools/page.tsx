@@ -4,9 +4,9 @@ import { getFilteredLinks, LinkItem } from '../../config/links';
 export default function Tools() {
   const links = getFilteredLinks(['goldCalc', 'raidAuction']);
   return (
-    <div className="grid w-full grid-cols-1 gap-2 p-4 md:grid-cols-2">
+    <div className="grid w-full grid-cols-1 gap-1 md:grid-cols-2">
       {links.map((link) => {
-        return <Card tool={link} />;
+        return <Card key={link.en} tool={link} />;
       })}
     </div>
   );
@@ -15,7 +15,7 @@ export default function Tools() {
 const Card = ({ tool }: { tool: LinkItem }) => {
   return (
     <Link key={tool.en} href={tool.href}>
-      <div className="w-full rounded border border-transparent bg-[var(--gray-3)] py-2 hover:border-[1px] hover:border-[var(--focus-11)]">
+      <div className="w-full rounded-lg border border-transparent bg-[var(--gray-3)] py-2 transition-all duration-300 hover:border-[1px] hover:border-[var(--focus-11)]">
         <div className="flex flex-row items-center">
           <div className="items-center px-4 text-lg font-semibold">
             {tool.ko}

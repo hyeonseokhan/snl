@@ -11,7 +11,7 @@ export default function ToolsLayout({ children }: { children: ReactNode }) {
   const toolsPath = getLink('tools');
   const links = getFilteredLinks(['goldCalc', 'raidAuction']);
   return (
-    <div className="flex flex-col px-4 md:px-36 md:pt-4">
+    <div className="flex flex-col px-4 md:px-36">
       <div
         className={`${toolsPath.href === pathname ? 'hidden' : ''} flex flex-row py-4`}
       >
@@ -21,11 +21,20 @@ export default function ToolsLayout({ children }: { children: ReactNode }) {
             <div key={link.en} className="flex flex-row items-center">
               <Link
                 href={link.href}
-                className={`text-xl font-bold transition-all duration-200 hover:text-[var(--gray-12)] ${pathname === link.href ? 'text-[var(--gray-12)]' : 'text-[var(--gray-10)]'}`}
+                className={`text-xl font-bold hover:text-[var(--gray-12)] hover:transition-all hover:duration-200 ${pathname === link.href ? 'text-[var(--gray-12)]' : 'text-[var(--gray-10)]'}`}
               >
                 {link.ko}
               </Link>
-              {!isLast && <SlashIcon />}
+              {link.isNew ? (
+                <span className="px-2 text-sm font-semibold text-red-700">
+                  new
+                </span>
+              ) : null}
+              {!isLast && (
+                <span className="px-2">
+                  <SlashIcon />
+                </span>
+              )}
             </div>
           );
         })}
