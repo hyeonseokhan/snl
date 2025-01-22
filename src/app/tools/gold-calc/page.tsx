@@ -165,17 +165,16 @@ export default function GoldCalculator() {
           />
         </div>
       </div>
-      <div
-        aria-label="history"
-        className="block w-full flex-row border-b border-[var(--gray-5)] pb-3 md:flex"
-      >
+      <div aria-label="history" className="block w-full flex-row pb-3 md:flex">
         <GoldCalculatorHeader
           title="골드구매내역"
           description="골드구매 내역정보"
         />
         <div className={`flex w-full md:w-9/12 md:flex-row`}>
           <div className="w-full rounded-lg border border-dashed border-[var(--gray-8)] p-3">
-            <div className="flex border-b border-[var(--gray-5)] pb-3 text-[var(--gray-11)] md:text-nowrap">
+            <div
+              className={`flex ${context.histories.length > 0 ? 'border-b border-[var(--gray-5)] pb-3' : ''} text-[var(--gray-11)] md:text-nowrap`}
+            >
               <div className="flex-1 text-center">현금시세</div>
               <div className="flex-1 text-center">구매골드</div>
               <div className="flex-1 text-center">현금지출</div>

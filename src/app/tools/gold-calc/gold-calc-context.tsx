@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useMemo } from 'react';
+import { useLocalStorage } from '../../../utils/use-local-storage';
 
 type GoldHistory = {
   key: string;
@@ -31,7 +32,10 @@ export function GoldCalculatorProvider({
 }: {
   children: React.ReactNode;
 }) {
-  const [histories, setGoldHistory] = React.useState<GoldHistory[]>([]);
+  const [histories, setGoldHistory] = useLocalStorage<GoldHistory[]>(
+    'tools/gold-calculator',
+    [],
+  );
   const statistics = useMemo(() => {
     if (histories.length === 0) {
       return {
