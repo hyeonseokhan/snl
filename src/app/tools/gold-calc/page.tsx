@@ -172,12 +172,12 @@ export default function GoldCalculator() {
         <div className={`flex w-full md:w-9/12 md:flex-row`}>
           <div className="w-full rounded-lg border border-dashed border-[var(--gray-8)] p-3">
             <div
-              className={`flex ${context.histories.length > 0 ? 'border-b border-[var(--gray-5)] pb-3' : ''} text-[var(--gray-11)] md:text-nowrap`}
+              className={`flex ${context.histories.length > 0 ? 'border-b border-[var(--gray-5)] pb-3' : ''} text-[var(--gray-11)]`}
             >
-              <div className="flex-1 text-center">현금시세</div>
-              <div className="flex-1 text-center">구매골드</div>
-              <div className="flex-1 text-center">현금지출</div>
-              <div className="flex-1 text-center">수령골드</div>
+              <div className="flex-1 text-center">시세</div>
+              <div className="flex-1 text-center">구매액</div>
+              <div className="flex-1 text-center">지출액</div>
+              <div className="flex-1 text-center">수령액</div>
               <div className="flex-1 text-center">삭제</div>
             </div>
             {context.histories.map((history) => (
