@@ -14,7 +14,7 @@ const MobileNavBar = () => {
   const { Icon, toggleTheme } = useThemeToggle();
   const links = getFilteredLinks(['todo', 'community', 'home', 'tools']);
   return (
-    <div className="fixed bottom-0 left-0 right-0 flex h-16 items-center justify-center md:hidden">
+    <div className="fixed bottom-0 left-0 right-0 z-10 flex h-16 items-center justify-center md:hidden">
       <Grid
         columns="5"
         rows="1"

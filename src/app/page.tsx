@@ -1,7 +1,12 @@
+import React from 'react';
+import Badge from '../components/Badge';
+
 export default function HomePage() {
   return (
-    <div>
-      <h1>여기는 홈 페이지입니다.</h1>
+    <div className={`relative flex w-full flex-row`}>
+      <Badge isInvisible={true} size={1}>
+        <span className={`text-lg font-semibold`}>홈 페이지</span>
+      </Badge>
     </div>
   );
 }

@@ -2,9 +2,10 @@
 
 import { ReactNode } from 'react';
 import Link from 'next/link';
-import { getFilteredLinks, getLink } from '../../config/links';
+import { getFilteredLinks } from '../../config/links';
 import { SlashIcon } from '../../components/icons/SlashIcon';
 import { usePathname } from 'next/navigation';
+import Badge from '../../components/Badge';
 
 export default function ToolsLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -16,17 +17,14 @@ export default function ToolsLayout({ children }: { children: ReactNode }) {
           const isLast = index === links.length - 1;
           return (
             <div key={link.en} className="flex flex-row items-center">
-              <Link
-                href={link.href}
-                className={`text-xl font-bold hover:text-[var(--gray-12)] hover:transition-all hover:duration-200 ${pathname === link.href ? 'text-[var(--gray-12)]' : 'text-[var(--gray-10)]'}`}
-              >
-                {link.ko}
-              </Link>
-              {link.isNew ? (
-                <span className="px-2 text-sm font-semibold text-red-700">
-                  new
-                </span>
-              ) : null}
+              <Badge isInvisible={link.isNew}>
+                <Link
+                  href={link.href}
+                  className={`text-xl font-bold hover:text-[var(--gray-12)] hover:transition-all hover:duration-200 ${pathname === link.href ? 'text-[var(--gray-12)]' : 'text-[var(--gray-10)]'}`}
+                >
+                  {link.ko}
+                </Link>
+              </Badge>
               {!isLast && (
                 <span className="px-2">
                   <SlashIcon />

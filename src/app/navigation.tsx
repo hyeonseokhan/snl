@@ -8,8 +8,8 @@ export function Navigation({ children }) {
   return (
     <Flex direction="column" width="100%" className="pb-16 md:mb-0">
       <DesktopNavBar />
-      <MobileNavBar />
       {children}
+      <MobileNavBar />
     </Flex>
   );
 }

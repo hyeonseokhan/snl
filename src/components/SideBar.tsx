@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useRef, useState } from 'react';
-import { Box, Flex } from '@radix-ui/themes';
 
 const SideBarContext = createContext<{
   isOpen: boolean;
@@ -11,7 +10,7 @@ const SideBarRoot: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const toggleSideBar = () => setIsOpen((prev) => !prev);
   return (
     <SideBarContext.Provider value={{ isOpen, toggleSideBar }}>
-      <Box className="relative">{children}</Box>
+      <div className="relative">{children}</div>
     </SideBarContext.Provider>
   );
 };
@@ -24,15 +23,12 @@ const SideBarButton: React.FC<{ children: React.ReactNode }> = ({
     throw new Error('SideBarButton must be used within SideBarRoot');
   const { toggleSideBar } = context;
   return (
-    <Flex
-      align="center"
-      py="2"
-      justify="center"
+    <div
       onClick={toggleSideBar}
-      className="cursor-pointer text-[var(--gray-12)]"
+      className="flex cursor-pointer items-center justify-center py-2 text-[var(--gray-12)]"
     >
       {children}
-    </Flex>
+    </div>
   );
 };
 
