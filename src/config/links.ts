@@ -26,7 +26,7 @@ export const links: Links = {
   tools: {
     ko: '도구모음',
     en: 'tools',
-    href: '/tools',
+    href: '/tools/gold-calc',
     icon: CalculatorIcon,
   },
   goldCalc: {

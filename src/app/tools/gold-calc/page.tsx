@@ -60,7 +60,6 @@ export default function GoldCalculator() {
   };
   const calculate = () => {
     if (!payload.cash || !payload.goldAmount) {
-      // openModal('입력값 오류', '계산에 필요한 모든 값을 입력해 주세요 🙏');
       return;
     }
     const pricePerGold = parseFloat(payload.cash) / parseFloat('100');
