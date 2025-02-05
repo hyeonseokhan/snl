@@ -9,6 +9,8 @@ const nextConfig: NextConfig = {
   devIndicators: {
     appIsrStatus: false,
   },
+  output: 'export',
+  distDir: 'docs',
 };
 
 export default nextConfig;

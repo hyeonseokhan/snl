@@ -1,4 +1,12 @@
-import React, { createContext, useContext, useRef, useState } from 'react';
+'use client';
+
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 
 const SideBarContext = createContext<{
   isOpen: boolean;
@@ -41,12 +49,18 @@ const SideBarContent: React.FC<SideBarContentProps> = ({
   children,
   position,
 }) => {
+  const [width, setWidth] = useState('w-64');
   const context = useContext(SideBarContext);
   if (!context)
     throw new Error('SideBarContent must be used within SideBarRoot');
   const { isOpen, toggleSideBar } = context;
   const target = useRef<HTMLDivElement>(null);
-  const width = window.innerWidth <= 768 ? 'w-3/4' : 'w-64';
+  // const width = window.innerWidth <= 768 ? 'w-3/4' : 'w-64';
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.innerWidth <= 768) {
+      setWidth('w-3/4');
+    }
+  }, []);
   const hidden = position === 'left' ? '-translate-x-full' : 'translate-x-full';
   const pos = position === 'left' ? 'left-0' : 'right-0';
   return (
