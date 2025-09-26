@@ -37,10 +37,10 @@ export const links: Links = {
     isNew: false,
   },
   raidAuction: {
-    ko: '레이드 경매 계산기',
-    en: 'raid-auction',
-    description: '레이드 경매 보상에 대한 적절한 입찰금 계산 도구',
-    href: '/tools/raid-auction',
+    ko: '랭커 스킬 사용 분석기',
+    en: 'skill-analyzer',
+    description: '상위 랭커의 코어와 스킬 채용 상태를 분석해주는 도구',
+    href: '/tools/skill-analyzer',
     isNew: true,
   },
 } as const;
