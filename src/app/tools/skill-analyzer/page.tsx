@@ -150,7 +150,7 @@ export default function SkillAnalyzer() {
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!job || !enlightenmentTree) {
-      alert('직업과 각성 트리를 모두 선택해주세요.');
+      alert('직업과 사용 각인를 모두 선택해주세요.');
       return;
     }
     if (requiredCores.length === 0) {
@@ -283,6 +283,20 @@ export default function SkillAnalyzer() {
   }
 
   async function fetchArmories(name: string): Promise<any> {
+    const cacheKey = `armory_${name}`;
+    const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+    const cachedItem = sessionStorage.getItem(cacheKey);
+    if (cachedItem) {
+      const { timestamp, data } = JSON.parse(cachedItem);
+      if (Date.now() - timestamp < CACHE_DURATION) {
+        log(`[캐시] ${name}님의 정보를 사용합니다.`);
+        console.log(`[CACHE] Using cached data for ${name}`);
+        return data;
+      }
+    }
+
+    log(`[API] ${name}님의 정보를 조회합니다.`);
     const headers = {
       accept: 'application/json',
       authorization: `bearer ${JWT_TOKEN}`,
@@ -303,6 +317,13 @@ export default function SkillAnalyzer() {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       const data = await response.json();
       console.log(`캐릭터 데이터 수신: ${name}`);
+
+      const newItem = {
+        timestamp: Date.now(),
+        data: data,
+      };
+      sessionStorage.setItem(cacheKey, JSON.stringify(newItem));
+
       return data;
     } catch (error: any) {
       if (error.name === 'AbortError') {
@@ -395,9 +416,13 @@ export default function SkillAnalyzer() {
       const rank = startRank + i;
       try {
         const armory = await fetchArmories(name);
+        if (!armory) {
+          log(`[실패] ${name}님의 정보를 가져오지 못했습니다.`);
+          continue;
+        }
         if (!hasCoresInArkGridSlots(armory, normalizedCores)) {
-          console.log(
-            `[SKIP] ${rank.toString().padStart(2, '0')}. ${name} - ArkGrid Slots에 사용 코어 미포함`,
+          log(
+            `[제외] ${rank.toString().padStart(2, '0')}. ${name} - 필수 코어를 사용하지 않습니다.`,
           );
           continue;
         }
@@ -412,12 +437,13 @@ export default function SkillAnalyzer() {
           ),
         );
         allRows.push(...rows);
-        console.log(
-          `[OK] ${rank.toString().padStart(2, '0')}. ${name} - 추출행 ${rows.length}`,
+        log(
+          `[성공] ${rank.toString().padStart(2, '0')}. ${name} - ${rows.length}개의 트라이포드 추출`,
         );
       } catch (error: any) {
-        console.log(
-          `[WARN] ${rank.toString().padStart(2, '0')}. ${name} - 실패: ${error.message}`,
+        log(
+          `[오류] ${rank.toString().padStart(2, '0')}. ${name} - 실패: ${error.message}`,
+          'error',
         );
       } finally {
         setProgress({
@@ -459,7 +485,7 @@ export default function SkillAnalyzer() {
       >
         <SectionHeader
           title="분석 정보 입력"
-          description="직업, 각성 트리, 사용 코어 등 분석에 필요한 정보를 입력합니다."
+          description="직업, 사용 각인, 사용 코어 등 분석에 필요한 정보를 입력합니다."
         />
         <div className="flex w-full flex-col gap-y-4 md:w-9/12">
           <div className="flex flex-col gap-4 md:flex-row">
@@ -490,7 +516,7 @@ export default function SkillAnalyzer() {
                 htmlFor="enlightenmentTree"
                 className="mb-2 block text-sm text-[var(--gray-11)]"
               >
-                각성 트리
+                사용 각인
               </label>
               <select
                 id="enlightenmentTree"
@@ -527,7 +553,7 @@ export default function SkillAnalyzer() {
                 ))
               ) : (
                 <span className="text-sm text-[var(--gray-9)]">
-                  각성 트리를 선택하면 코어가 표시됩니다.
+                  사용 각인를 선택하면 코어가 표시됩니다.
                 </span>
               )}
             </div>
