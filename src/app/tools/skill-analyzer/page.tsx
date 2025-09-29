@@ -1,91 +1,31 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-
-// Constants
-const KLOA_BASE = 'https://api.korlark.com';
-const RANKING_PATH = '/lostark/ranking/combat-power';
-const LA_BASE = 'https://developer-lostark.game.onstove.com';
-const JWT_TOKEN =
-  'eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsIng1dCI6IktYMk40TkRDSTJ5NTA5NWpjTWk5TllqY2lyZyIsImtpZCI6IktYMk40TkRDSTJ5NTA5NWpjTWk5TllqY2lyZyJ9.eyJpc3MiOiJodHRwczovL2x1ZHkuZ2FtZS5vbnN0b3ZlLmNvbSIsImF1ZCI6Imh0dHBzOi8vbHVkeS5nYW1lLm9uc3RvdmUuY29tL3Jlc291cmNlcyIsImNsaWVudF9pZCI6IjEwMDAwMDAwMDA1NjkyODUifQ.hh54P6GUsGwp9hk_coxKFZfDVkEuJKFlsBRh2HeQ7kZvr_bkKCRLWsTGa_lj9CEni0rHQDy1rXe9omuAKpOFUowvQPhUxt53y0-j06PS5Y3i0JAW_q1q6sx7KqJU3ewB4WOCR4qcgNUeM_M_AjgIZajiYPsaKWRrEuF-I4SLY0L2DblvIw6SPVFMv5talP-gvnd3sfKizqCCSusVemtYB5RJ3xq_Ot5Qt3mVHfHhm9y3YHHtPoLZz3iEZpnN2GbihbHLpdeU6hOTm_wBUX7_ns-eOyWcuzN7nIr-p8A7qgjP9tETgRuStDW04fmJpPF6zmW2rxXqh-reP2zPLrlzGA';
-const LA_FILTERS = 'combat-skills+arkgrid';
-const TIMEOUT = 8000;
-const SLEEP_BETWEEN = 250;
-
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { SectionHeader, CoreCategorySelector, StatCard } from './components';
+import { fetchRankNames, fetchArmories, CONCURRENCY_ARMORY } from './api';
+import {
+  aggregateSkillUsageByCharacter,
+  deepCleanHtml,
+  extractArkgridSlotNameSet,
+  extractSelectedRows,
+  mapPool,
+  norm,
+} from './utils';
+import type {
+  AnalysisResult,
+  ApiCallbacks,
+  PreparedCharacterData,
+  ProgressState,
+  TripodTableRow,
+} from './types';
 import { JOB_DATA } from '../../../config/jobData';
+import type { EnlightenmentTree } from '../../../config/jobData';
 
-import { EnlightenmentTree } from '../../../config/jobData';
+const ANALYSIS_STEPS = 4;
 
-interface AnalysisResult {
-  allRows: any[];
-  skillUsageRows: any[];
-  keptCharacters: string[];
-  totalCharacters: number;
-}
-
-interface ProgressState {
-  current: number;
-  total: number;
-  message: string;
-}
-
-// Utility functions
-function cleanText(s: any): string {
-  if (typeof s !== 'string') return s;
-  return s
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/&[^;]+;/g, (match) => {
-      const entities: { [key: string]: string } = {
-        '&amp;': '&',
-        '&lt;': '<',
-        '&gt;': '>',
-        '&quot;': '"',
-        '&#39;': "'",
-        '&nbsp;': ' ',
-      };
-      return entities[match] || match;
-    })
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-function norm(s: any): string {
-  if (typeof s !== 'string') return s;
-  return s.toLowerCase().replace(/\s+/g, '');
-}
-
-function deepCleanHtml(obj: any): any {
-  if (Array.isArray(obj)) {
-    return obj.map(deepCleanHtml);
-  }
-  if (obj && typeof obj === 'object') {
-    const result: { [key: string]: any } = {};
-    for (const [key, value] of Object.entries(obj)) {
-      result[key] = deepCleanHtml(value);
-    }
-    return result;
-  }
-  if (typeof obj === 'string') {
-    return cleanText(obj);
-  }
-  return obj;
-}
-
-// Section Header Component
-const SectionHeader = ({
-  title,
-  description,
-}: {
-  title: string;
-  description: string;
-}) => (
-  <div className="flex w-full flex-col pb-4 md:w-3/12 md:gap-y-3 md:pb-0 md:pr-8">
-    <div className="text-[var(--gray-12)]">{title}</div>
-    <div className="text-sm text-[var(--gray-9)]">{description}</div>
-  </div>
-);
-
-// Main Component
+/**
+ * 로스트아크 전투력 랭킹을 기반으로 스킬 및 트라이포드 사용 통계를 분석하는 페이지 컴포넌트입니다.
+ */
 export default function SkillAnalyzer() {
   const [job, setJob] = useState('');
   const [enlightenmentTree, setEnlightenmentTree] = useState('');
@@ -99,9 +39,15 @@ export default function SkillAnalyzer() {
   });
   const [logs, setLogs] = useState<string[]>([]);
   const [results, setResults] = useState<AnalysisResult | null>(null);
-  const [preparedData, setPreparedData] = useState<any[]>([]);
+  const [preparedData, setPreparedData] = useState<PreparedCharacterData[]>([]);
   const [totalRanked, setTotalRanked] = useState<number>(0);
   const [selectedSkill, setSelectedSkill] = useState<string | null>(null);
+
+  const [quotaBanner, setQuotaBanner] = useState<{
+    active: boolean;
+    shown: number;
+    total: number;
+  }>({ active: false, shown: 0, total: 60 });
 
   const [enlightenmentOptions, setEnlightenmentOptions] = useState<
     EnlightenmentTree[]
@@ -117,36 +63,65 @@ export default function SkillAnalyzer() {
     moon?: string;
     star?: string;
   }>({});
+  const logBoxRef = useRef<HTMLDivElement | null>(null);
 
+  // 분석 과정을 기록하고 화면에 표시하기 위한 로그 함수
   const log = useCallback(
     (message: string, type: 'info' | 'error' = 'info') => {
       const time = new Date().toLocaleTimeString();
       setLogs((prev) => [...prev, `[${time}] ${message}`]);
-      if (type === 'error') console.log(message);
-      else console.log(message);
+      if (type === 'error') console.error(message);
     },
     [],
   );
 
+  // API 모듈에 전달하여 UI 상태(로딩, 쿼터 대기 등)를 업데이트하기 위한 콜백 함수 객체
+  const apiCallbacks: ApiCallbacks = useMemo(
+    () => ({
+      log,
+      startQuotaStatus: (totalSec: number) => {
+        setQuotaBanner({ active: true, shown: 0, total: totalSec });
+      },
+      updateQuotaStatus: (shownSec: number, totalSec: number) => {
+        setQuotaBanner({ active: true, shown: shownSec, total: totalSec });
+      },
+      endQuotaStatus: () => {
+        setQuotaBanner((prev) => ({ ...prev, active: false }));
+      },
+    }),
+    [log],
+  );
+
+  // 로그가 추가될 때마다 로그 박스를 맨 아래로 스크롤합니다.
+  useEffect(() => {
+    const el = logBoxRef.current;
+    if (el) {
+      el.scrollTop = el.scrollHeight;
+    }
+  }, [logs]);
+
+  // 직업 변경 시, 선택된 코어 및 관련 옵션을 초기화하는 함수
+  const resetCoreSelection = useCallback(() => {
+    setCoreOptionsByCategory({ sun: [], moon: [], star: [] });
+    setCoreOptions([]);
+    setSelectedCoresByCategory({});
+    setRequiredCores([]);
+  }, []);
+
+  // 직업(job) 선택이 변경되면 해당 직업의 각인 목록을 설정합니다.
   useEffect(() => {
     const selectedJobData = JOB_DATA.find((j) => j.code.toString() === job);
     if (selectedJobData) {
       setEnlightenmentOptions(selectedJobData.enlightenmentTree);
       setEnlightenmentTree('');
-      setCoreOptions([]);
-      setRequiredCores([]);
-      setCoreOptionsByCategory({ sun: [], moon: [], star: [] });
-      setSelectedCoresByCategory({});
-      setRequiredCores([]);
+      resetCoreSelection();
     } else {
       setEnlightenmentOptions([]);
-      setCoreOptions([]);
-      setCoreOptionsByCategory({ sun: [], moon: [], star: [] });
-      setSelectedCoresByCategory({});
-      setRequiredCores([]);
+      resetCoreSelection();
     }
-  }, [job]);
+  }, [job, resetCoreSelection]);
 
+  // 직업 각인(enlightenmentTree) 선택이 변경되면 해당 각인의 코어 목록을 설정합니다.
   useEffect(() => {
     const selectedTreeData = enlightenmentOptions.find(
       (t) => t.name === enlightenmentTree,
@@ -165,13 +140,14 @@ export default function SkillAnalyzer() {
       setRequiredCores([]);
       setSelectedCoresByCategory({});
     } else {
-      setCoreOptionsByCategory({ sun: [], moon: [], star: [] });
-      setCoreOptions([]);
-      setSelectedCoresByCategory({});
-      setRequiredCores([]);
+      resetCoreSelection();
     }
-  }, [enlightenmentTree, enlightenmentOptions]);
+  }, [enlightenmentTree, enlightenmentOptions, resetCoreSelection]);
 
+  /**
+   * 코어 선택 버튼을 토글(선택/해제)하는 함수입니다.
+   * @param {string} core - 선택된 코어의 이름
+   */
   const toggleCore = (core: string) => {
     const category = coreOptionsByCategory.sun.includes(core)
       ? 'sun'
@@ -185,6 +161,7 @@ export default function SkillAnalyzer() {
     }));
   };
 
+  // 사용자가 선택한 카테고리별 코어를 하나의 배열로 통합합니다.
   useEffect(() => {
     const list = [
       selectedCoresByCategory.sun,
@@ -194,310 +171,174 @@ export default function SkillAnalyzer() {
     setRequiredCores(list);
   }, [selectedCoresByCategory]);
 
-  const handleFormSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!job || !enlightenmentTree) {
-      alert('직업과 직업 각인를 모두 선택해주세요.');
-      return;
-    }
-
-    setIsAnalyzing(true);
+  // 새로운 분석 시작 시, 이전 상태(로그, 진행률, 결과 등)를 모두 초기화하는 함수
+  const resetAnalysisState = useCallback(() => {
     setLogs(['데이터 수집을 시작합니다...']);
     setProgress({ current: 0, total: 100, message: '' });
-    try {
-      setSelectedCoresByCategory({});
-      setRequiredCores([]);
-      setPreparedData([]);
-      setResults(null);
-      await acquireRankAndCharacters(
-        1,
-        parseInt(endRank),
-        job,
-        enlightenmentTree,
-      );
-      log(
-        '검색 데이터 수집이 완료되었습니다. 조건을 선택하면 통계를 즉시 갱신합니다.',
-      );
-    } catch (error: any) {
-      log(`검색 중 오류 발생: ${error.message}`, 'error');
-      alert(`검색 중 오류가 발생했습니다: ${error.message}`);
-    } finally {
-      setIsAnalyzing(false);
-    }
-  };
+    setSelectedCoresByCategory({});
+    setRequiredCores([]);
+    setPreparedData([]);
+    setResults(null);
+  }, []);
 
-  // 데이터 수집 및 준비 (필터링 X)
-  async function acquireRankAndCharacters(
-    startRank: number,
-    endRank: number,
-    job: string,
-    enlightenmentTree: string,
-  ) {
-    log(
-      `설정: 직업=${job}, 각성트리=${enlightenmentTree}, 랭크=${startRank}-${endRank}`,
-    );
-    setProgress({ current: 0, total: 4, message: '랭킹 데이터 수집 중...' });
-    const names = await fetchRankNames(
-      startRank,
-      endRank,
+  /**
+   * 캐릭터 이름 목록을 받아, 각 캐릭터의 상세 정보를 API로 조회하고 분석에 필요한 형태로 가공합니다.
+   * @param {string[]} names - 캐릭터 이름 배열
+   * @param {number} startRank - 분석 시작 순위 (로그 표기용)
+   * @returns {Promise<PreparedCharacterData[]>} - 가공된 캐릭터 데이터 배열을 담은 Promise
+   */
+  const fetchAndPrepareCharacterData = useCallback(
+    async (names: string[], startRank: number) => {
+      const prepared: PreparedCharacterData[] = [];
+      let completed = 0;
+
+      const results = await mapPool<
+        string,
+        (PreparedCharacterData & { rank: number }) | undefined
+      >(names, CONCURRENCY_ARMORY, async (name, i) => {
+        const rank = startRank + i;
+        try {
+          const armory = await fetchArmories(name, apiCallbacks);
+          if (!armory) {
+            log(`[실패] ${name}님의 정보를 가져오지 못했습니다.`);
+            return undefined;
+          }
+          const skillsClean = deepCleanHtml(armory.ArmorySkills || []);
+          const rows = extractSelectedRows(name, skillsClean);
+          const usedSkills = aggregateSkillUsageByCharacter(skillsClean);
+          const arkgridSet = extractArkgridSlotNameSet(armory);
+          return { name, rows, usedSkills, arkgridSet, rank };
+        } catch (error: any) {
+          log(
+            `[오류] ${rank.toString().padStart(2, '0')}. ${name} - 실패: ${error.message}`,
+            'error',
+          );
+          return undefined;
+        } finally {
+          completed += 1;
+          setProgress({
+            current: completed,
+            total: names.length,
+            message: `캐릭터 데이터 수집 중... (${completed}/${names.length})`,
+          });
+        }
+      });
+
+      for (const item of results) {
+        if (item) {
+          prepared.push({
+            name: item.name,
+            rows: item.rows,
+            usedSkills: item.usedSkills,
+            arkgridSet: item.arkgridSet,
+          });
+          log(
+            `[완료] ${String(item.rank).padStart(2, '0')}. ${item.name} - ${item.rows.length}개의 트라이포드 추출`,
+          );
+        }
+      }
+
+      return prepared;
+    },
+    [apiCallbacks, log],
+  );
+
+  // 폼 제출 시 실행되는 메인 로직: 랭커 목록 조회 > 캐릭터별 상세 정보 조회의 순서로 데이터를 수집합니다.
+  const acquireRankAndCharacters = useCallback(
+    async (
+      startRank: number,
+      endRankNum: number,
+      jobCode: string,
+      treeName: string,
+    ) => {
+      log(
+        `설정: 직업=${jobCode}, 각성트리=${treeName}, 랭크=${startRank}-${endRankNum}`,
+      );
+      setProgress({
+        current: 0,
+        total: ANALYSIS_STEPS,
+        message: '랭킹 데이터 수집 중...',
+      });
+      const names = await fetchRankNames(
+        startRank,
+        endRankNum,
+        jobCode,
+        treeName,
+        apiCallbacks,
+      );
+      setTotalRanked(names.length);
+      log(`랭킹 데이터 수집 완료: ${names.length}명`);
+
+      setProgress({
+        current: 1,
+        total: ANALYSIS_STEPS,
+        message: '캐릭터 데이터 수집 중...',
+      });
+      log('캐릭터 데이터 수집을 시작합니다...');
+      const prepared = await fetchAndPrepareCharacterData(names, startRank);
+
+      setProgress({
+        current: 3,
+        total: ANALYSIS_STEPS,
+        message: '결과 준비 중...',
+      });
+      setPreparedData(prepared);
+      setProgress({ current: 4, total: ANALYSIS_STEPS, message: '완료' });
+    },
+    [apiCallbacks, log, fetchAndPrepareCharacterData],
+  );
+
+  // 사용자가 '검색 시작' 버튼을 눌렀을 때 폼 제출을 처리하는 이벤트 핸들러입니다.
+  const handleFormSubmit = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!job || !enlightenmentTree) {
+        alert('직업과 직업 각인를 모두 선택해주세요.');
+        return;
+      }
+
+      setIsAnalyzing(true);
+      resetAnalysisState();
+      try {
+        await acquireRankAndCharacters(
+          1,
+          parseInt(endRank),
+          job,
+          enlightenmentTree,
+        );
+        log(
+          '검색 데이터 수집이 완료되었습니다. 조건을 선택하면 통계를 즉시 갱신합니다.',
+        );
+      } catch (error: any) {
+        log(`검색 중 오류 발생: ${error.message}`, 'error');
+        alert(`검색 중 오류가 발생했습니다: ${error.message}`);
+      } finally {
+        setIsAnalyzing(false);
+      }
+    },
+    [
       job,
       enlightenmentTree,
-    );
-    setTotalRanked(names.length);
-    log(`랭킹 데이터 수집 완료: ${names.length}명`);
+      endRank,
+      resetAnalysisState,
+      acquireRankAndCharacters,
+      log,
+    ],
+  );
 
-    setProgress({ current: 1, total: 4, message: '캐릭터 데이터 수집 중...' });
-    log('캐릭터 데이터 수집을 시작합니다...');
-    const prepared = await fetchAndPrepareCharacterData(names, startRank);
-
-    setProgress({ current: 3, total: 4, message: '결과 준비 중...' });
-    setPreparedData(prepared);
-    setProgress({ current: 4, total: 4, message: '완료' });
-  }
-  // ArkGrid 슬롯명 집합 추출 (정규화)
-  function extractArkgridSlotNameSet(armory: any): Set<string> {
-    const set = new Set<string>();
-    if (!armory || !armory.ArkGrid || !Array.isArray(armory.ArkGrid.Slots))
-      return set;
-    for (const slot of armory.ArkGrid.Slots) {
-      if (slot && typeof slot.Name === 'string') set.add(norm(slot.Name));
-    }
-    return set;
-  }
-
-  async function fetchRankNames(
-    startRank: number,
-    endRank: number,
-    job: string,
-    enlightenmentTree: string,
-  ): Promise<string[]> {
-    if (startRank < 1 || endRank < startRank) return [];
-    const names: string[] = [];
-    const limit = 50;
-    const firstPage = Math.floor((startRank - 1) / limit) + 1;
-    const lastPage = Math.floor((endRank - 1) / limit) + 1;
-
-    for (let page = firstPage; page <= lastPage; page++) {
-      const params = new URLSearchParams({
-        job,
-        enlightenment_tree: enlightenmentTree,
-        limit: limit.toString(),
-        page: page.toString(),
-      });
-      const url = `${KLOA_BASE}${RANKING_PATH}?${params}`;
-      console.log(`랭킹 데이터 요청: ${url}`);
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), TIMEOUT);
-        const response = await fetch(url, {
-          signal: controller.signal,
-          mode: 'cors',
-          headers: { Accept: 'application/json' },
-        });
-        clearTimeout(timeoutId);
-        if (!response.ok)
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        const data = await response.json();
-        console.log(`랭킹 데이터 수신: ${data.length}개 항목`);
-        data.forEach((row: any) => {
-          if (row.name) names.push(row.name);
-        });
-      } catch (error: any) {
-        if (error.name === 'AbortError') {
-          console.log(`랭킹 데이터 요청 시간초과: ${url}`);
-          throw new Error(
-            '요청 시간이 초과되었습니다. 네트워크 상태를 확인해주세요.',
-          );
-        } else if (error.message.includes('CORS')) {
-          console.log(`CORS 에러: ${error.message}`);
-          throw new Error(
-            'CORS 정책으로 인해 API 요청이 차단되었습니다. 브라우저 확장 프로그램을 비활성화하거나 다른 브라우저를 시도해보세요.',
-          );
-        } else {
-          console.log(`랭킹 데이터 요청 실패: ${error.message}`);
-          throw error;
-        }
-      }
-    }
-    return names.slice(startRank - 1, endRank);
-  }
-
-  async function fetchArmories(name: string): Promise<any> {
-    const cacheKey = `armory_${name}`;
-    const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
-
-    const cachedItem = sessionStorage.getItem(cacheKey);
-    if (cachedItem) {
-      const { timestamp, data } = JSON.parse(cachedItem);
-      if (Date.now() - timestamp < CACHE_DURATION) {
-        log(`[캐시] ${name}님의 정보를 사용합니다.`);
-        console.log(`[CACHE] Using cached data for ${name}`);
-        return data;
-      }
-    }
-
-    log(`[API] ${name}님의 정보를 조회합니다.`);
-    const headers = {
-      accept: 'application/json',
-      authorization: `bearer ${JWT_TOKEN}`,
-    };
-    const encName = encodeURIComponent(name);
-    const url = `${LA_BASE}/armories/characters/${encName}?filters=${LA_FILTERS}`;
-    console.log(`캐릭터 데이터 요청: ${name}`);
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), TIMEOUT);
-      const response = await fetch(url, {
-        headers,
-        signal: controller.signal,
-        mode: 'cors',
-      });
-      clearTimeout(timeoutId);
-      if (!response.ok)
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      const data = await response.json();
-      console.log(`캐릭터 데이터 수신: ${name}`);
-
-      const newItem = {
-        timestamp: Date.now(),
-        data: data,
-      };
-      sessionStorage.setItem(cacheKey, JSON.stringify(newItem));
-
-      return data;
-    } catch (error: any) {
-      if (error.name === 'AbortError') {
-        console.log(`캐릭터 데이터 요청 시간초과: ${name}`);
-        throw new Error(`요청 시간이 초과되었습니다: ${name}`);
-      } else if (error.message.includes('CORS')) {
-        console.log(`CORS 에러: ${name} - ${error.message}`);
-        throw new Error(
-          `CORS 정책으로 인해 API 요청이 차단되었습니다: ${name}`,
-        );
-      } else {
-        console.log(`캐릭터 데이터 요청 실패: ${name} - ${error.message}`);
-        throw error;
-      }
-    }
-  }
-
-  function hasCoresInArkGridSlots(
-    armory: any,
-    normalizedCores: Set<string>,
-  ): boolean {
-    if (!armory || !armory.ArkGrid || !armory.ArkGrid.Slots) return false;
-    const foundCores = new Set<string>();
-    for (const slot of armory.ArkGrid.Slots) {
-      if (!slot || typeof slot.Name !== 'string') continue;
-      const slotNameNorm = norm(slot.Name);
-      for (const coreNorm of Array.from(normalizedCores)) {
-        // Changed to Array.from()
-        if (slotNameNorm.includes(coreNorm)) foundCores.add(coreNorm);
-      }
-    }
-    return foundCores.size === normalizedCores.size;
-  }
-
-  function extractSelectedRows(character: string, skillsClean: any[]): any[] {
-    const rows: any[] = [];
-    if (!Array.isArray(skillsClean)) return rows;
-    for (const item of skillsClean) {
-      try {
-        const level = item.Level || 0;
-        if (typeof level !== 'number' || level <= 1) continue;
-        const skillName = cleanText(item.Name || '');
-        const rune = item.Rune || {};
-        const runeName = cleanText(rune.Name || '');
-        const tripods = item.Tripods || [];
-        for (const tp of tripods) {
-          if (tp?.IsSelected) {
-            rows.push({
-              character,
-              skill_name: skillName,
-              skill_level: level,
-              tripod_tier: tp.Tier,
-              tripod_name: cleanText(tp.Name || ''),
-              rune_name: runeName,
-            });
-          }
-        }
-      } catch (error: any) {
-        console.log(`트라이포드 추출 중 오류: ${error.message}`);
-      }
-    }
-    return rows;
-  }
-
-  function aggregateSkillUsageByCharacter(skillsClean: any[]): Set<string> {
-    const used = new Set<string>();
-    if (!Array.isArray(skillsClean)) return used;
-    for (const item of skillsClean) {
-      if (
-        typeof item.Name === 'string' &&
-        typeof item.Level === 'number' &&
-        item.Level > 1
-      ) {
-        used.add(cleanText(item.Name));
-      }
-    }
-    return used;
-  }
-
-  // 캐릭터별 데이터만 수집 (필터링 X)
-  async function fetchAndPrepareCharacterData(
-    names: string[],
-    startRank: number,
-  ) {
-    const prepared: any[] = [];
-    for (let i = 0; i < names.length; i++) {
-      const name = names[i];
-      const rank = startRank + i;
-      try {
-        const armory = await fetchArmories(name);
-        if (!armory) {
-          log(`[실패] ${name}님의 정보를 가져오지 못했습니다.`);
-          continue;
-        }
-        const skillsClean = deepCleanHtml(armory.ArmorySkills || []);
-        const rows = extractSelectedRows(name, skillsClean);
-        const usedSkills = aggregateSkillUsageByCharacter(skillsClean);
-        const arkgridSet = extractArkgridSlotNameSet(armory);
-
-        prepared.push({ name, rows, usedSkills, arkgridSet });
-        log(
-          `[완료] ${rank.toString().padStart(2, '0')}. ${name} - ${rows.length}개의 트라이포드 추출`,
-        );
-      } catch (error: any) {
-        log(
-          `[오류] ${rank.toString().padStart(2, '0')}. ${name} - 실패: ${error.message}`,
-          'error',
-        );
-      } finally {
-        setProgress({
-          current: i + 1,
-          total: names.length,
-          message: `캐릭터 데이터 수집 중... (${i + 1}/${names.length})`,
-        });
-        await new Promise((resolve) => setTimeout(resolve, SLEEP_BETWEEN));
-      }
-    }
-    return prepared;
-  }
-
-  // 실시간 필터링: 코어 선택이 바뀌면 준비된 데이터에서 결과 재계산
+  // 준비된 데이터(preparedData)나 필요 코어(requiredCores)가 변경될 때마다 실시간으로 통계 결과를 필터링하고 계산합니다.
   useEffect(() => {
     if (!preparedData || preparedData.length === 0) {
       setResults(null);
       return;
     }
     if (requiredCores.length === 0) {
-      // 코어 미선택 시 결과를 숨기거나 전체 보기로 바꾸고 싶다면 이 로직을 조정
       setResults(null);
       return;
     }
     const normalizedCores = new Set(requiredCores.map(norm));
     const kept: string[] = [];
-    const allRows: any[] = [];
+    const allRows: TripodTableRow[] = [];
     const skillUsageCounter = new Map<string, number>();
 
     for (const entry of preparedData) {
@@ -524,40 +365,54 @@ export default function SkillAnalyzer() {
     });
   }, [requiredCores, preparedData, totalRanked]);
 
-  const groupedTripodData = results?.allRows.reduce((acc, row) => {
-    const charKey = row.character;
-    const skillKey = row.skill_name;
-    if (!acc[charKey]) acc[charKey] = {};
-    if (!acc[charKey][skillKey]) {
-      acc[charKey][skillKey] = {
-        skill_level: row.skill_level,
-        rune_name: row.rune_name,
-        tripods: [],
-      };
-    }
-    if (row.tripod_name)
-      acc[charKey][skillKey].tripods.push({
-        tier: row.tripod_tier,
-        name: row.tripod_name,
-      });
-    return acc;
-  }, {} as any);
+  // 최종 분석 결과를 캐릭터별, 스킬별로 그룹화하여 상세 테이블에 표시하기 쉽게 가공합니다.
+  const groupedTripodData = useMemo(() => {
+    if (!results) return {};
+    return results.allRows.reduce((acc, row) => {
+      const charKey = row.character;
+      const skillKey = row.skill_name;
+      if (!acc[charKey]) acc[charKey] = {};
+      if (!acc[charKey][skillKey]) {
+        acc[charKey][skillKey] = {
+          skill_level: row.skill_level,
+          rune_name: row.rune_name,
+          tripods: [],
+        };
+      }
+      if (row.tripod_name)
+        acc[charKey][skillKey].tripods.push({
+          tier: row.tripod_tier,
+          name: row.tripod_name,
+        });
+      return acc;
+    }, {} as any);
+  }, [results]);
 
   const coresEnabled = preparedData.length > 0;
+  const isWaiting = quotaBanner.active;
+  const waitingPct = isWaiting
+    ? Math.min(
+        100,
+        Math.round((quotaBanner.shown / Math.max(1, quotaBanner.total)) * 100),
+      )
+    : 0;
+  const buttonLabel = isWaiting
+    ? `토큰 대기 중(${waitingPct}%)`
+    : isAnalyzing
+      ? '검색 중...'
+      : '검색 시작';
+
   return (
     <div className="flex w-full flex-col gap-y-4 rounded-lg bg-[var(--gray-3)] p-5">
-      {/* Input Section */}
       <form
         onSubmit={handleFormSubmit}
         className="block w-full flex-row border-b border-[var(--gray-5)] pb-3 md:flex"
       >
-        {/* Row 1: 검색 정보 입력 */}
         <SectionHeader
           title="검색 정보 입력"
           description="직업, 각인, 대상 수 등을 설정합니다."
         />
         <div className="flex w-full flex-wrap items-end gap-4 md:w-9/12">
-          {/* 직업 선택 */}
           <div>
             <label
               htmlFor="job"
@@ -581,7 +436,6 @@ export default function SkillAnalyzer() {
             </select>
           </div>
 
-          {/* 직업 각인 */}
           <div>
             <label
               htmlFor="enlightenmentTree"
@@ -606,7 +460,6 @@ export default function SkillAnalyzer() {
             </select>
           </div>
 
-          {/* 분석 대상 */}
           <div>
             <label
               htmlFor="endRank"
@@ -628,14 +481,18 @@ export default function SkillAnalyzer() {
             </select>
           </div>
 
-          {/* 검색 시작 버튼 */}
           <div className="flex items-end">
             <button
               type="submit"
-              disabled={isAnalyzing}
-              className="h-9 w-auto rounded border border-[var(--gray-8)] px-6 text-[var(--gray-12)] transition-all active:bg-[var(--accent-6)] disabled:cursor-not-allowed disabled:bg-[var(--gray-5)]"
+              disabled={isAnalyzing || isWaiting}
+              className={`${
+                isWaiting
+                  ? 'h-9 w-auto animate-pulse cursor-wait rounded border border-[var(--accent-10)] bg-[var(--accent-10)] px-6 text-white transition-all'
+                  : 'h-9 w-auto rounded border border-[var(--gray-8)] px-6 text-[var(--gray-12)] transition-all active:bg-[var(--accent-6)]'
+              } disabled:cursor-not-allowed disabled:bg-[var(--gray-5)]`}
+              aria-live="polite"
             >
-              {isAnalyzing ? '검색 중...' : '검색 시작'}
+              {buttonLabel}
             </button>
           </div>
         </div>
@@ -643,7 +500,6 @@ export default function SkillAnalyzer() {
 
       {(isAnalyzing || preparedData.length > 0) && (
         <>
-          {/* Row 2: 조건 상세 (사용 코어) */}
           <div className="block w-full flex-row pb-3 pt-3 md:flex">
             <SectionHeader
               title="조건 상세"
@@ -655,87 +511,30 @@ export default function SkillAnalyzer() {
                   <>
                     <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-4">
                       <div className="flex flex-col gap-3 md:flex-row md:flex-wrap">
-                        {/* Sun */}
-                        <div className="inline-flex min-w-0 flex-col gap-1">
-                          <div className="text-xs font-semibold text-[var(--red-9)]">
-                            질서의 해 코어
-                          </div>
-                          <div className="flex min-h-12 items-center rounded-md border border-dashed border-[var(--gray-7)] p-2">
-                            {coreOptionsByCategory.sun.length > 0 ? (
-                              <div className="flex flex-wrap gap-2">
-                                {coreOptionsByCategory.sun.map((core) => (
-                                  <button
-                                    key={`sun-${core}`}
-                                    type="button"
-                                    onClick={() => toggleCore(core)}
-                                    disabled={!coresEnabled}
-                                    className={`rounded-full border px-3 py-1 text-xs transition-all ${selectedCoresByCategory.sun === core ? 'border-[var(--accent-10)] bg-[var(--accent-9)] text-white' : 'border-[var(--gray-6)] bg-[var(--gray-1)] text-[var(--gray-11)] hover:bg-[var(--gray-4)]'} ${!coresEnabled ? 'cursor-not-allowed opacity-50' : ''}`}
-                                  >
-                                    {core}
-                                  </button>
-                                ))}
-                              </div>
-                            ) : (
-                              <div className="text-xs text-[var(--gray-9)]">
-                                -
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                        {/* Moon */}
-                        <div className="inline-flex min-w-0 flex-col gap-1">
-                          <div className="text-xs font-semibold text-[var(--red-9)]">
-                            질서의 달 코어
-                          </div>
-                          <div className="flex min-h-12 items-center rounded-md border border-dashed border-[var(--gray-7)] p-2">
-                            {coreOptionsByCategory.moon.length > 0 ? (
-                              <div className="flex flex-wrap gap-2">
-                                {coreOptionsByCategory.moon.map((core) => (
-                                  <button
-                                    key={`moon-${core}`}
-                                    type="button"
-                                    onClick={() => toggleCore(core)}
-                                    disabled={!coresEnabled}
-                                    className={`rounded-full border px-3 py-1 text-xs transition-all ${selectedCoresByCategory.moon === core ? 'border-[var(--accent-10)] bg-[var(--accent-9)] text-white' : 'border-[var(--gray-6)] bg-[var(--gray-1)] text-[var(--gray-11)] hover:bg-[var(--gray-4)]'} ${!coresEnabled ? 'cursor-not-allowed opacity-50' : ''}`}
-                                  >
-                                    {core}
-                                  </button>
-                                ))}
-                              </div>
-                            ) : (
-                              <div className="text-xs text-[var(--gray-9)]">
-                                -
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                        {/* Star */}
-                        <div className="inline-flex min-w-0 flex-col gap-1">
-                          <div className="text-xs font-semibold text-[var(--red-9)]">
-                            질서의 별 코어
-                          </div>
-                          <div className="flex min-h-12 items-center rounded-md border border-dashed border-[var(--gray-7)] p-2">
-                            {coreOptionsByCategory.star.length > 0 ? (
-                              <div className="flex flex-wrap gap-2">
-                                {coreOptionsByCategory.star.map((core) => (
-                                  <button
-                                    key={`star-${core}`}
-                                    type="button"
-                                    onClick={() => toggleCore(core)}
-                                    disabled={!coresEnabled}
-                                    className={`rounded-full border px-3 py-1 text-xs transition-all ${selectedCoresByCategory.star === core ? 'border-[var(--accent-10)] bg-[var(--accent-9)] text-white' : 'border-[var(--gray-6)] bg-[var(--gray-1)] text-[var(--gray-11)] hover:bg-[var(--gray-4)]'} ${!coresEnabled ? 'cursor-not-allowed opacity-50' : ''}`}
-                                  >
-                                    {core}
-                                  </button>
-                                ))}
-                              </div>
-                            ) : (
-                              <div className="text-xs text-[var(--gray-9)]">
-                                -
-                              </div>
-                            )}
-                          </div>
-                        </div>
+                        <CoreCategorySelector
+                          title="질서의 해 코어"
+                          category="sun"
+                          cores={coreOptionsByCategory.sun}
+                          selectedCore={selectedCoresByCategory.sun}
+                          onToggle={toggleCore}
+                          disabled={!coresEnabled}
+                        />
+                        <CoreCategorySelector
+                          title="질서의 달 코어"
+                          category="moon"
+                          cores={coreOptionsByCategory.moon}
+                          selectedCore={selectedCoresByCategory.moon}
+                          onToggle={toggleCore}
+                          disabled={!coresEnabled}
+                        />
+                        <CoreCategorySelector
+                          title="질서의 별 코어"
+                          category="star"
+                          cores={coreOptionsByCategory.star}
+                          selectedCore={selectedCoresByCategory.star}
+                          onToggle={toggleCore}
+                          disabled={!coresEnabled}
+                        />
                       </div>
                     </div>
                   </>
@@ -764,7 +563,6 @@ export default function SkillAnalyzer() {
         </div>
       )}
 
-      {/* Results Section */}
       {results && (
         <>
           <div className="block w-full flex-row border-b border-[var(--gray-5)] pb-3 md:flex">
@@ -808,7 +606,11 @@ export default function SkillAnalyzer() {
                   <div
                     key={row.skill_name}
                     onClick={() => setSelectedSkill(row.skill_name)}
-                    className={`flex h-10 cursor-pointer items-center text-sm text-[var(--gray-11)] hover:bg-[var(--gray-4)] ${selectedSkill === row.skill_name ? 'bg-[var(--accent-3)]' : ''}`}
+                    className={`flex h-10 cursor-pointer items-center text-sm text-[var(--gray-11)] hover:bg-[var(--gray-4)] ${
+                      selectedSkill === row.skill_name
+                        ? 'bg-[var(--accent-6)]'
+                        : ''
+                    }`}
                   >
                     <div className="flex-1 text-center font-medium">
                       {row.skill_name}
@@ -853,15 +655,30 @@ export default function SkillAnalyzer() {
                         key={character}
                         className={`flex border-b border-[var(--gray-4)] text-xs text-[var(--gray-11)] last:border-b-0`}
                       >
-                        <div className="flex w-1/5 items-center justify-center border-r border-[var(--gray-4)] p-2 font-bold">
-                          {character}
+                        <div className="flex w-1/5 items-center justify-center border-r border-[var(--gray-4)] p-2 text-sm font-bold md:text-base">
+                          <a
+                            href={`https://kloa.gg/characters/${encodeURIComponent(character)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sky-600 underline decoration-from-font underline-offset-2 transition-colors hover:text-sky-700 hover:underline dark:text-sky-400 dark:hover:text-sky-300"
+                          >
+                            {character}
+                          </a>
                         </div>
                         <div className="w-4/5">
                           {skillEntries.map(
                             ([skillName, skillData]: [string, any], index) => (
                               <div
                                 key={skillName}
-                                className={`flex min-h-10 items-center ${index < skillEntries.length - 1 ? 'border-b border-[var(--gray-4)]' : ''} ${selectedSkill === skillName ? 'bg-[var(--accent-3)]' : ''}`}
+                                className={`flex min-h-10 items-center ${
+                                  index < skillEntries.length - 1
+                                    ? 'border-b border-[var(--gray-4)]'
+                                    : ''
+                                } ${
+                                  selectedSkill === skillName
+                                    ? 'bg-[var(--accent-6)]'
+                                    : ''
+                                }`}
                               >
                                 <div className="w-3/12 p-2 text-center">
                                   {skillName}
@@ -901,7 +718,10 @@ export default function SkillAnalyzer() {
             description="API 요청 및 데이터 처리 과정의 로그입니다."
           />
           <div className="w-full md:w-9/12">
-            <div className="max-h-60 overflow-y-auto rounded-lg bg-[var(--gray-1)] p-4 font-mono text-xs text-[var(--gray-11)]">
+            <div
+              ref={logBoxRef}
+              className="max-h-60 overflow-y-auto rounded-lg bg-[var(--gray-1)] p-4 font-mono text-xs text-[var(--gray-11)]"
+            >
               {logs.map((logMsg, i) => (
                 <div key={i}>{logMsg}</div>
               ))}
@@ -912,16 +732,3 @@ export default function SkillAnalyzer() {
     </div>
   );
 }
-
-const StatCard = ({
-  label,
-  value,
-}: {
-  label: string;
-  value: string | number;
-}) => (
-  <div className="flex flex-col items-center justify-center rounded-lg border border-[var(--gray-5)] bg-[var(--gray-1)] p-4">
-    <div className="text-2xl font-bold text-[var(--accent-10)]">{value}</div>
-    <div className="mt-1 text-xs text-[var(--gray-11)]">{label}</div>
-  </div>
-);
