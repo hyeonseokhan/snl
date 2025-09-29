@@ -99,18 +99,30 @@ export default function SkillAnalyzer() {
   });
   const [logs, setLogs] = useState<string[]>([]);
   const [results, setResults] = useState<AnalysisResult | null>(null);
+  const [preparedData, setPreparedData] = useState<any[]>([]);
+  const [totalRanked, setTotalRanked] = useState<number>(0);
   const [selectedSkill, setSelectedSkill] = useState<string | null>(null);
 
   const [enlightenmentOptions, setEnlightenmentOptions] = useState<
     EnlightenmentTree[]
   >([]);
   const [coreOptions, setCoreOptions] = useState<string[]>([]);
+  const [coreOptionsByCategory, setCoreOptionsByCategory] = useState<{
+    sun: string[];
+    moon: string[];
+    star: string[];
+  }>({ sun: [], moon: [], star: [] });
+  const [selectedCoresByCategory, setSelectedCoresByCategory] = useState<{
+    sun?: string;
+    moon?: string;
+    star?: string;
+  }>({});
 
   const log = useCallback(
     (message: string, type: 'info' | 'error' = 'info') => {
       const time = new Date().toLocaleTimeString();
       setLogs((prev) => [...prev, `[${time}] ${message}`]);
-      if (type === 'error') console.error(message);
+      if (type === 'error') console.log(message);
       else console.log(message);
     },
     [],
@@ -123,9 +135,15 @@ export default function SkillAnalyzer() {
       setEnlightenmentTree('');
       setCoreOptions([]);
       setRequiredCores([]);
+      setCoreOptionsByCategory({ sun: [], moon: [], star: [] });
+      setSelectedCoresByCategory({});
+      setRequiredCores([]);
     } else {
       setEnlightenmentOptions([]);
       setCoreOptions([]);
+      setCoreOptionsByCategory({ sun: [], moon: [], star: [] });
+      setSelectedCoresByCategory({});
+      setRequiredCores([]);
     }
   }, [job]);
 
@@ -133,96 +151,118 @@ export default function SkillAnalyzer() {
     const selectedTreeData = enlightenmentOptions.find(
       (t) => t.name === enlightenmentTree,
     );
-    if (selectedTreeData) {
-      setCoreOptions(selectedTreeData.arkgrid);
+    if (selectedTreeData && (selectedTreeData as any).arkgrid) {
+      const grid = (selectedTreeData as any).arkgrid as {
+        sun?: { name: string }[];
+        moon?: { name: string }[];
+        star?: { name: string }[];
+      };
+      const sun = grid.sun?.map((c) => c.name) ?? [];
+      const moon = grid.moon?.map((c) => c.name) ?? [];
+      const star = grid.star?.map((c) => c.name) ?? [];
+      setCoreOptionsByCategory({ sun, moon, star });
+      setCoreOptions([...sun, ...moon, ...star]);
       setRequiredCores([]);
+      setSelectedCoresByCategory({});
     } else {
+      setCoreOptionsByCategory({ sun: [], moon: [], star: [] });
       setCoreOptions([]);
+      setSelectedCoresByCategory({});
+      setRequiredCores([]);
     }
   }, [enlightenmentTree, enlightenmentOptions]);
 
   const toggleCore = (core: string) => {
-    setRequiredCores((prev) =>
-      prev.includes(core) ? prev.filter((c) => c !== core) : [...prev, core],
-    );
+    const category = coreOptionsByCategory.sun.includes(core)
+      ? 'sun'
+      : coreOptionsByCategory.moon.includes(core)
+        ? 'moon'
+        : 'star';
+    setSelectedCoresByCategory((prev) => ({
+      ...prev,
+      [category]:
+        prev[category as 'sun' | 'moon' | 'star'] === core ? undefined : core,
+    }));
   };
+
+  useEffect(() => {
+    const list = [
+      selectedCoresByCategory.sun,
+      selectedCoresByCategory.moon,
+      selectedCoresByCategory.star,
+    ].filter(Boolean) as string[];
+    setRequiredCores(list);
+  }, [selectedCoresByCategory]);
 
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!job || !enlightenmentTree) {
-      alert('직업과 사용 각인를 모두 선택해주세요.');
-      return;
-    }
-    if (requiredCores.length === 0) {
-      alert('하나 이상의 사용 코어를 선택해주세요.');
+      alert('직업과 직업 각인를 모두 선택해주세요.');
       return;
     }
 
     setIsAnalyzing(true);
-    setLogs(['분석을 시작합니다...']);
-    setResults(null);
+    setLogs(['데이터 수집을 시작합니다...']);
     setProgress({ current: 0, total: 100, message: '' });
-
     try {
-      await runAnalysis(
+      setSelectedCoresByCategory({});
+      setRequiredCores([]);
+      setPreparedData([]);
+      setResults(null);
+      await acquireRankAndCharacters(
         1,
         parseInt(endRank),
         job,
         enlightenmentTree,
-        requiredCores,
       );
-      log('분석이 완료되었습니다!');
+      log(
+        '검색 데이터 수집이 완료되었습니다. 조건을 선택하면 통계를 즉시 갱신합니다.',
+      );
     } catch (error: any) {
-      log(`분석 중 오류 발생: ${error.message}`, 'error');
-      alert(`분석 중 오류가 발생했습니다: ${error.message}`);
+      log(`검색 중 오류 발생: ${error.message}`, 'error');
+      alert(`검색 중 오류가 발생했습니다: ${error.message}`);
     } finally {
       setIsAnalyzing(false);
     }
   };
 
-  async function runAnalysis(
+  // 데이터 수집 및 준비 (필터링 X)
+  async function acquireRankAndCharacters(
     startRank: number,
     endRank: number,
     job: string,
     enlightenmentTree: string,
-    requiredCores: string[],
   ) {
     log(
-      `설정: 직업=${job}, 각성트리=${enlightenmentTree}, 랭크=${startRank}-${endRank}, 필수코어=${requiredCores.join(', ')}`,
+      `설정: 직업=${job}, 각성트리=${enlightenmentTree}, 랭크=${startRank}-${endRank}`,
     );
-    const normalizedCores = new Set(requiredCores.map(norm));
-
     setProgress({ current: 0, total: 4, message: '랭킹 데이터 수집 중...' });
-    log('실제 API를 사용하여 랭킹 데이터를 수집합니다.');
     const names = await fetchRankNames(
       startRank,
       endRank,
       job,
       enlightenmentTree,
     );
+    setTotalRanked(names.length);
     log(`랭킹 데이터 수집 완료: ${names.length}명`);
 
     setProgress({ current: 1, total: 4, message: '캐릭터 데이터 수집 중...' });
     log('캐릭터 데이터 수집을 시작합니다...');
-    const { kept, allRows, skillUsageCounter } =
-      await fetchAndFilterCharacterData(names, startRank, normalizedCores);
+    const prepared = await fetchAndPrepareCharacterData(names, startRank);
 
-    setProgress({ current: 2, total: 4, message: '결과 처리 중...' });
-    const skillUsageRows = Array.from(skillUsageCounter.entries())
-      .map(([skillName, characters]) => ({ skill_name: skillName, characters }))
-      .sort((a, b) => b.characters - a.characters);
-    log(
-      `캐릭터 데이터 수집 완료: 필터 통과 ${kept.length}명 / 총 추출 행 ${allRows.length}개 / 스킬 집계 ${skillUsageRows.length}개`,
-    );
-
-    setProgress({ current: 3, total: 4, message: '결과 표시 중...' });
-    setResults({
-      allRows,
-      skillUsageRows,
-      keptCharacters: kept,
-      totalCharacters: names.length,
-    });
+    setProgress({ current: 3, total: 4, message: '결과 준비 중...' });
+    setPreparedData(prepared);
     setProgress({ current: 4, total: 4, message: '완료' });
+  }
+  // ArkGrid 슬롯명 집합 추출 (정규화)
+  function extractArkgridSlotNameSet(armory: any): Set<string> {
+    const set = new Set<string>();
+    if (!armory || !armory.ArkGrid || !Array.isArray(armory.ArkGrid.Slots))
+      return set;
+    for (const slot of armory.ArkGrid.Slots) {
+      if (slot && typeof slot.Name === 'string') set.add(norm(slot.Name));
+    }
+    return set;
   }
 
   async function fetchRankNames(
@@ -403,14 +443,12 @@ export default function SkillAnalyzer() {
     return used;
   }
 
-  async function fetchAndFilterCharacterData(
+  // 캐릭터별 데이터만 수집 (필터링 X)
+  async function fetchAndPrepareCharacterData(
     names: string[],
     startRank: number,
-    normalizedCores: Set<string>,
   ) {
-    const kept: string[] = [];
-    const allRows: any[] = [];
-    const skillUsageCounter = new Map<string, number>();
+    const prepared: any[] = [];
     for (let i = 0; i < names.length; i++) {
       const name = names[i];
       const rank = startRank + i;
@@ -420,25 +458,14 @@ export default function SkillAnalyzer() {
           log(`[실패] ${name}님의 정보를 가져오지 못했습니다.`);
           continue;
         }
-        if (!hasCoresInArkGridSlots(armory, normalizedCores)) {
-          log(
-            `[제외] ${rank.toString().padStart(2, '0')}. ${name} - 필수 코어를 사용하지 않습니다.`,
-          );
-          continue;
-        }
-        kept.push(name);
         const skillsClean = deepCleanHtml(armory.ArmorySkills || []);
         const rows = extractSelectedRows(name, skillsClean);
         const usedSkills = aggregateSkillUsageByCharacter(skillsClean);
-        usedSkills.forEach((skillName) =>
-          skillUsageCounter.set(
-            skillName,
-            (skillUsageCounter.get(skillName) || 0) + 1,
-          ),
-        );
-        allRows.push(...rows);
+        const arkgridSet = extractArkgridSlotNameSet(armory);
+
+        prepared.push({ name, rows, usedSkills, arkgridSet });
         log(
-          `[성공] ${rank.toString().padStart(2, '0')}. ${name} - ${rows.length}개의 트라이포드 추출`,
+          `[완료] ${rank.toString().padStart(2, '0')}. ${name} - ${rows.length}개의 트라이포드 추출`,
         );
       } catch (error: any) {
         log(
@@ -454,8 +481,48 @@ export default function SkillAnalyzer() {
         await new Promise((resolve) => setTimeout(resolve, SLEEP_BETWEEN));
       }
     }
-    return { kept, allRows, skillUsageCounter };
+    return prepared;
   }
+
+  // 실시간 필터링: 코어 선택이 바뀌면 준비된 데이터에서 결과 재계산
+  useEffect(() => {
+    if (!preparedData || preparedData.length === 0) {
+      setResults(null);
+      return;
+    }
+    if (requiredCores.length === 0) {
+      // 코어 미선택 시 결과를 숨기거나 전체 보기로 바꾸고 싶다면 이 로직을 조정
+      setResults(null);
+      return;
+    }
+    const normalizedCores = new Set(requiredCores.map(norm));
+    const kept: string[] = [];
+    const allRows: any[] = [];
+    const skillUsageCounter = new Map<string, number>();
+
+    for (const entry of preparedData) {
+      const hasAll = Array.from(normalizedCores).every((core) =>
+        Array.from(entry.arkgridSet).some((s: string) => s.includes(core)),
+      );
+      if (!hasAll) continue;
+      kept.push(entry.name);
+      allRows.push(...entry.rows);
+      entry.usedSkills.forEach((skill: string) => {
+        skillUsageCounter.set(skill, (skillUsageCounter.get(skill) || 0) + 1);
+      });
+    }
+
+    const skillUsageRows = Array.from(skillUsageCounter.entries())
+      .map(([skillName, characters]) => ({ skill_name: skillName, characters }))
+      .sort((a, b) => b.characters - a.characters);
+
+    setResults({
+      allRows,
+      skillUsageRows,
+      keptCharacters: kept,
+      totalCharacters: totalRanked,
+    });
+  }, [requiredCores, preparedData, totalRanked]);
 
   const groupedTripodData = results?.allRows.reduce((acc, row) => {
     const charKey = row.character;
@@ -476,6 +543,7 @@ export default function SkillAnalyzer() {
     return acc;
   }, {} as any);
 
+  const coresEnabled = preparedData.length > 0;
   return (
     <div className="flex w-full flex-col gap-y-4 rounded-lg bg-[var(--gray-3)] p-5">
       {/* Input Section */}
@@ -483,112 +551,204 @@ export default function SkillAnalyzer() {
         onSubmit={handleFormSubmit}
         className="block w-full flex-row border-b border-[var(--gray-5)] pb-3 md:flex"
       >
+        {/* Row 1: 검색 정보 입력 */}
         <SectionHeader
-          title="분석 정보 입력"
-          description="직업, 사용 각인, 사용 코어 등 분석에 필요한 정보를 입력합니다."
+          title="검색 정보 입력"
+          description="직업, 각인, 대상 수 등을 설정합니다."
         />
-        <div className="flex w-full flex-col gap-y-4 md:w-9/12">
-          <div className="flex flex-col gap-4 md:flex-row">
-            <div>
-              <label
-                htmlFor="job"
-                className="mb-2 block text-sm text-[var(--gray-11)]"
-              >
-                직업 선택
-              </label>
-              <select
-                id="job"
-                value={job}
-                onChange={(e) => setJob(e.target.value)}
-                required
-                className="rounded border border-[var(--gray-4)] px-3 py-1.5 text-[var(--gray-12)] outline-none focus:border-[var(--accent-10)] focus:transition-all focus:duration-300"
-              >
-                <option value="">직업을 선택하세요</option>
-                {JOB_DATA.map((j) => (
-                  <option key={j.code} value={j.code}>
-                    {j.class}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label
-                htmlFor="enlightenmentTree"
-                className="mb-2 block text-sm text-[var(--gray-11)]"
-              >
-                사용 각인
-              </label>
-              <select
-                id="enlightenmentTree"
-                value={enlightenmentTree}
-                onChange={(e) => setEnlightenmentTree(e.target.value)}
-                required
-                disabled={!job}
-                className="rounded border border-[var(--gray-4)] px-3 py-1.5 text-[var(--gray-12)] outline-none focus:border-[var(--accent-10)] focus:transition-all focus:duration-300 disabled:bg-[var(--gray-1)]"
-              >
-                <option value="">직업을 먼저 선택하세요</option>
-                {enlightenmentOptions.map((tree) => (
-                  <option key={tree.name} value={tree.name}>
-                    {tree.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
+        <div className="flex w-full flex-wrap items-end gap-4 md:w-9/12">
+          {/* 직업 선택 */}
           <div>
-            <label className="mb-2 block text-sm text-[var(--gray-11)]">
-              사용 코어 (다중 선택)
+            <label
+              htmlFor="job"
+              className="mb-2 block text-sm text-[var(--gray-11)]"
+            >
+              직업 선택
             </label>
-            <div className="inline-flex max-w-full flex-wrap gap-2 rounded-md border border-dashed border-[var(--gray-8)] p-3">
-              {coreOptions.length > 0 ? (
-                coreOptions.map((core) => (
-                  <button
-                    key={core}
-                    type="button"
-                    onClick={() => toggleCore(core)}
-                    className={`rounded-full border px-3 py-1 text-xs transition-all ${requiredCores.includes(core) ? 'border-[var(--accent-10)] bg-[var(--accent-9)] text-white' : 'border-[var(--gray-6)] bg-[var(--gray-1)] text-[var(--gray-11)] hover:bg-[var(--gray-4)]'}`}
-                  >
-                    {core}
-                  </button>
-                ))
-              ) : (
-                <span className="text-sm text-[var(--gray-9)]">
-                  사용 각인를 선택하면 코어가 표시됩니다.
-                </span>
-              )}
-            </div>
+            <select
+              id="job"
+              value={job}
+              onChange={(e) => setJob(e.target.value)}
+              required
+              className="w-auto rounded border border-[var(--gray-4)] px-3 py-1.5 text-[var(--gray-12)] outline-none focus:border-[var(--accent-10)] focus:transition-all focus:duration-300"
+            >
+              <option value="">직업을 선택하세요</option>
+              {JOB_DATA.map((j) => (
+                <option key={j.code} value={j.code}>
+                  {j.class}
+                </option>
+              ))}
+            </select>
           </div>
-          <div className="flex flex-col items-end gap-4 md:flex-row">
-            <div>
-              <label
-                htmlFor="endRank"
-                className="mb-2 block text-sm text-[var(--gray-11)]"
-              >
-                분석할 상위 랭커 수
-              </label>
-              <select
-                id="endRank"
-                value={endRank}
-                onChange={(e) => setEndRank(e.target.value)}
-                required
-                className="rounded border border-[var(--gray-4)] px-3 py-1.5 text-[var(--gray-12)] outline-none focus:border-[var(--accent-10)] focus:transition-all focus:duration-300"
-              >
-                <option value="10">상위 10명</option>
-                <option value="30">상위 30명</option>
-                <option value="50">상위 50명</option>
-                <option value="100">상위 100명</option>
-              </select>
-            </div>
+
+          {/* 직업 각인 */}
+          <div>
+            <label
+              htmlFor="enlightenmentTree"
+              className="mb-2 block text-sm text-[var(--gray-11)]"
+            >
+              직업 각인
+            </label>
+            <select
+              id="enlightenmentTree"
+              value={enlightenmentTree}
+              onChange={(e) => setEnlightenmentTree(e.target.value)}
+              required
+              disabled={!job}
+              className="w-auto rounded border border-[var(--gray-4)] px-3 py-1.5 text-[var(--gray-12)] outline-none focus:border-[var(--accent-10)] focus:transition-all focus:duration-300 disabled:bg-[var(--gray-1)]"
+            >
+              <option value="">직업을 먼저 선택하세요</option>
+              {enlightenmentOptions.map((tree) => (
+                <option key={tree.name} value={tree.name}>
+                  {tree.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* 분석 대상 */}
+          <div>
+            <label
+              htmlFor="endRank"
+              className="mb-2 block text-sm text-[var(--gray-11)]"
+            >
+              분석 대상
+            </label>
+            <select
+              id="endRank"
+              value={endRank}
+              onChange={(e) => setEndRank(e.target.value)}
+              required
+              className="w-auto rounded border border-[var(--gray-4)] px-3 py-1.5 text-[var(--gray-12)] outline-none focus:border-[var(--accent-10)] focus:transition-all focus:duration-300"
+            >
+              <option value="10">상위 10명</option>
+              <option value="30">상위 30명</option>
+              <option value="50">상위 50명</option>
+              <option value="100">상위 100명</option>
+            </select>
+          </div>
+
+          {/* 검색 시작 버튼 */}
+          <div className="flex items-end">
             <button
               type="submit"
               disabled={isAnalyzing}
-              className="h-9 rounded border border-[var(--gray-8)] px-6 text-[var(--gray-12)] transition-all active:bg-[var(--accent-6)] disabled:cursor-not-allowed disabled:bg-[var(--gray-5)]"
+              className="h-9 w-auto rounded border border-[var(--gray-8)] px-6 text-[var(--gray-12)] transition-all active:bg-[var(--accent-6)] disabled:cursor-not-allowed disabled:bg-[var(--gray-5)]"
             >
-              {isAnalyzing ? '분석 중...' : '분석 시작'}
+              {isAnalyzing ? '검색 중...' : '검색 시작'}
             </button>
           </div>
         </div>
       </form>
+
+      {(isAnalyzing || preparedData.length > 0) && (
+        <>
+          {/* Row 2: 조건 상세 (사용 코어) */}
+          <div className="block w-full flex-row pb-3 pt-3 md:flex">
+            <SectionHeader
+              title="조건 상세"
+              description="사용 코어를 선택해 조건을 세부 설정합니다."
+            />
+            <div className="w-full md:w-9/12">
+              <div className="inline-flex w-fit max-w-full flex-col gap-3 self-start md:w-auto">
+                {coreOptions.length > 0 ? (
+                  <>
+                    <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-4">
+                      <div className="flex flex-col gap-3 md:flex-row md:flex-wrap">
+                        {/* Sun */}
+                        <div className="inline-flex min-w-0 flex-col gap-1">
+                          <div className="text-xs font-semibold text-[var(--red-9)]">
+                            질서의 해 코어
+                          </div>
+                          <div className="flex min-h-12 items-center rounded-md border border-dashed border-[var(--gray-7)] p-2">
+                            {coreOptionsByCategory.sun.length > 0 ? (
+                              <div className="flex flex-wrap gap-2">
+                                {coreOptionsByCategory.sun.map((core) => (
+                                  <button
+                                    key={`sun-${core}`}
+                                    type="button"
+                                    onClick={() => toggleCore(core)}
+                                    disabled={!coresEnabled}
+                                    className={`rounded-full border px-3 py-1 text-xs transition-all ${selectedCoresByCategory.sun === core ? 'border-[var(--accent-10)] bg-[var(--accent-9)] text-white' : 'border-[var(--gray-6)] bg-[var(--gray-1)] text-[var(--gray-11)] hover:bg-[var(--gray-4)]'} ${!coresEnabled ? 'cursor-not-allowed opacity-50' : ''}`}
+                                  >
+                                    {core}
+                                  </button>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="text-xs text-[var(--gray-9)]">
+                                -
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        {/* Moon */}
+                        <div className="inline-flex min-w-0 flex-col gap-1">
+                          <div className="text-xs font-semibold text-[var(--red-9)]">
+                            질서의 달 코어
+                          </div>
+                          <div className="flex min-h-12 items-center rounded-md border border-dashed border-[var(--gray-7)] p-2">
+                            {coreOptionsByCategory.moon.length > 0 ? (
+                              <div className="flex flex-wrap gap-2">
+                                {coreOptionsByCategory.moon.map((core) => (
+                                  <button
+                                    key={`moon-${core}`}
+                                    type="button"
+                                    onClick={() => toggleCore(core)}
+                                    disabled={!coresEnabled}
+                                    className={`rounded-full border px-3 py-1 text-xs transition-all ${selectedCoresByCategory.moon === core ? 'border-[var(--accent-10)] bg-[var(--accent-9)] text-white' : 'border-[var(--gray-6)] bg-[var(--gray-1)] text-[var(--gray-11)] hover:bg-[var(--gray-4)]'} ${!coresEnabled ? 'cursor-not-allowed opacity-50' : ''}`}
+                                  >
+                                    {core}
+                                  </button>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="text-xs text-[var(--gray-9)]">
+                                -
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        {/* Star */}
+                        <div className="inline-flex min-w-0 flex-col gap-1">
+                          <div className="text-xs font-semibold text-[var(--red-9)]">
+                            질서의 별 코어
+                          </div>
+                          <div className="flex min-h-12 items-center rounded-md border border-dashed border-[var(--gray-7)] p-2">
+                            {coreOptionsByCategory.star.length > 0 ? (
+                              <div className="flex flex-wrap gap-2">
+                                {coreOptionsByCategory.star.map((core) => (
+                                  <button
+                                    key={`star-${core}`}
+                                    type="button"
+                                    onClick={() => toggleCore(core)}
+                                    disabled={!coresEnabled}
+                                    className={`rounded-full border px-3 py-1 text-xs transition-all ${selectedCoresByCategory.star === core ? 'border-[var(--accent-10)] bg-[var(--accent-9)] text-white' : 'border-[var(--gray-6)] bg-[var(--gray-1)] text-[var(--gray-11)] hover:bg-[var(--gray-4)]'} ${!coresEnabled ? 'cursor-not-allowed opacity-50' : ''}`}
+                                  >
+                                    {core}
+                                  </button>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="text-xs text-[var(--gray-9)]">
+                                -
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <span className="text-sm text-[var(--gray-9)]">
+                    직업 각인를 선택하면 코어가 표시됩니다.
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
 
       {isAnalyzing && (
         <div className="my-4 rounded-lg bg-[var(--gray-2)] p-4">
