@@ -63,7 +63,7 @@ export const CoreCategorySelector = ({
               </button>
               <div
                 role="tooltip"
-                className="pointer-events-none invisible absolute bottom-full left-1/2 z-50 w-72 -translate-x-1/2 -translate-y-2 whitespace-pre-wrap rounded-md border border-[var(--gray-6)] bg-[var(--gray-1)] p-3 text-[var(--gray-12)] opacity-0 shadow-lg transition-opacity duration-300 group-hover:visible group-hover:opacity-100"
+                className="pointer-events-none invisible absolute bottom-full left-1/2 z-50 w-80 -translate-x-1/2 -translate-y-2 whitespace-pre-wrap rounded-md border border-[var(--gray-6)] bg-[var(--gray-1)] p-3 text-[var(--gray-12)] opacity-0 shadow-lg transition-opacity duration-300 group-hover:visible group-hover:opacity-100"
               >
                 <div className="mb-1 text-xs font-semibold text-[var(--gray-11)]">
                   상세 효과
