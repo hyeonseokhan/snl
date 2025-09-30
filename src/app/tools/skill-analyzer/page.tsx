@@ -31,6 +31,8 @@ export default function SkillAnalyzer() {
   const [job, setJob] = useState('');
   const [enlightenmentTree, setEnlightenmentTree] = useState('');
   const [endRank, setEndRank] = useState('10');
+  const [minCombatPower, setMinCombatPower] = useState('0');
+  const [maxCombatPower, setMaxCombatPower] = useState('9999');
   const [requiredCores, setRequiredCores] = useState<string[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [progress, setProgress] = useState<ProgressState>({
@@ -287,9 +289,11 @@ export default function SkillAnalyzer() {
       endRankNum: number,
       jobCode: string,
       treeName: string,
+      minCP: number,
+      maxCP: number,
     ) => {
       log(
-        `설정: 직업=${jobCode}, 각성트리=${treeName}, 랭크=${startRank}-${endRankNum}`,
+        `설정: 직업=${jobCode}, 각성트리=${treeName}, 랭크=${startRank}-${endRankNum}, 전투력=${minCP}-${maxCP}`,
       );
       setProgress({
         current: 0,
@@ -301,6 +305,8 @@ export default function SkillAnalyzer() {
         endRankNum,
         jobCode,
         treeName,
+        minCP,
+        maxCP,
         apiCallbacks,
       );
       setTotalRanked(names.length);
@@ -342,6 +348,8 @@ export default function SkillAnalyzer() {
           parseInt(endRank),
           job,
           enlightenmentTree,
+          parseInt(minCombatPower, 10) || 0,
+          parseInt(maxCombatPower, 10) || 9999,
         );
         log(
           '검색 데이터 수집이 완료되었습니다. 조건을 선택하면 통계를 즉시 갱신합니다.',
@@ -357,6 +365,8 @@ export default function SkillAnalyzer() {
       job,
       enlightenmentTree,
       endRank,
+      minCombatPower,
+      maxCombatPower,
       resetAnalysisState,
       acquireRankAndCharacters,
       log,
@@ -449,88 +459,128 @@ export default function SkillAnalyzer() {
           title="검색 정보 입력"
           description="직업, 각인, 대상 수 등을 설정합니다."
         />
-        <div className="flex w-full flex-wrap items-end gap-4 md:w-9/12">
-          <div>
-            <label
-              htmlFor="job"
-              className="mb-2 block text-sm text-[var(--gray-11)]"
-            >
-              직업 선택
-            </label>
-            <select
-              id="job"
-              value={job}
-              onChange={(e) => setJob(e.target.value)}
-              required
-              className="w-auto rounded border border-[var(--gray-4)] px-3 py-1.5 text-[var(--gray-12)] outline-none focus:border-[var(--accent-10)] focus:transition-all focus:duration-300"
-            >
-              <option value="">직업을 선택하세요</option>
-              {JOB_DATA.map((j) => (
-                <option key={j.code} value={j.code}>
-                  {j.class}
-                </option>
-              ))}
-            </select>
+        <div className="flex w-full flex-col gap-4 md:w-9/12">
+          {/* Row 1 */}
+          <div className="flex flex-wrap items-end gap-4">
+            <div>
+              <label
+                htmlFor="job"
+                className="mb-2 block text-sm text-[var(--gray-11)]"
+              >
+                직업 선택
+              </label>
+              <select
+                id="job"
+                value={job}
+                onChange={(e) => setJob(e.target.value)}
+                required
+                className="w-auto rounded border border-[var(--gray-4)] px-3 py-1.5 text-[var(--gray-12)] outline-none focus:border-[var(--accent-10)] focus:transition-all focus:duration-300"
+              >
+                <option value="">직업을 선택하세요</option>
+                {JOB_DATA.map((j) => (
+                  <option key={j.code} value={j.code}>
+                    {j.class}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label
+                htmlFor="enlightenmentTree"
+                className="mb-2 block text-sm text-[var(--gray-11)]"
+              >
+                직업 각인
+              </label>
+              <select
+                id="enlightenmentTree"
+                value={enlightenmentTree}
+                onChange={(e) => setEnlightenmentTree(e.target.value)}
+                required
+                disabled={!job}
+                className="w-auto rounded border border-[var(--gray-4)] px-3 py-1.5 text-[var(--gray-12)] outline-none focus:border-[var(--accent-10)] focus:transition-all focus:duration-300 disabled:bg-[var(--gray-1)]"
+              >
+                <option value="">직업을 먼저 선택하세요</option>
+                {enlightenmentOptions.map((tree) => (
+                  <option key={tree.name} value={tree.name}>
+                    {tree.name}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
-          <div>
-            <label
-              htmlFor="enlightenmentTree"
-              className="mb-2 block text-sm text-[var(--gray-11)]"
-            >
-              직업 각인
-            </label>
-            <select
-              id="enlightenmentTree"
-              value={enlightenmentTree}
-              onChange={(e) => setEnlightenmentTree(e.target.value)}
-              required
-              disabled={!job}
-              className="w-auto rounded border border-[var(--gray-4)] px-3 py-1.5 text-[var(--gray-12)] outline-none focus:border-[var(--accent-10)] focus:transition-all focus:duration-300 disabled:bg-[var(--gray-1)]"
-            >
-              <option value="">직업을 먼저 선택하세요</option>
-              {enlightenmentOptions.map((tree) => (
-                <option key={tree.name} value={tree.name}>
-                  {tree.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          {/* Row 2 */}
+          <div className="flex flex-wrap items-end gap-4">
+            <div>
+              <label
+                htmlFor="minCombatPower"
+                className="mb-2 block text-sm text-[var(--gray-11)]"
+              >
+                최소 전투력
+              </label>
+              <input
+                id="minCombatPower"
+                type="number"
+                value={minCombatPower}
+                onChange={(e) => setMinCombatPower(e.target.value)}
+                className="w-24 rounded border border-[var(--gray-4)] px-3 py-1.5 text-[var(--gray-12)] outline-none focus:border-[var(--accent-10)] focus:transition-all focus:duration-300"
+                placeholder="0"
+              />
+            </div>
 
-          <div>
-            <label
-              htmlFor="endRank"
-              className="mb-2 block text-sm text-[var(--gray-11)]"
-            >
-              분석 대상
-            </label>
-            <select
-              id="endRank"
-              value={endRank}
-              onChange={(e) => setEndRank(e.target.value)}
-              required
-              className="w-auto rounded border border-[var(--gray-4)] px-3 py-1.5 text-[var(--gray-12)] outline-none focus:border-[var(--accent-10)] focus:transition-all focus:duration-300"
-            >
-              <option value="10">상위 10명</option>
-              <option value="30">상위 30명</option>
-              <option value="50">상위 50명</option>
-              <option value="100">상위 100명</option>
-            </select>
-          </div>
+            <div>
+              <label
+                htmlFor="maxCombatPower"
+                className="mb-2 block text-sm text-[var(--gray-11)]"
+              >
+                최대 전투력
+              </label>
+              <input
+                id="maxCombatPower"
+                type="number"
+                value={maxCombatPower}
+                onChange={(e) => setMaxCombatPower(e.target.value)}
+                className="w-24 rounded border border-[var(--gray-4)] px-3 py-1.5 text-[var(--gray-12)] outline-none focus:border-[var(--accent-10)] focus:transition-all focus:duration-300"
+                placeholder="9999"
+              />
+            </div>
 
-          <div className="flex items-end">
-            <button
-              type="submit"
-              disabled={isAnalyzing || isWaiting}
-              className={`${
-                isWaiting
-                  ? 'h-9 w-auto animate-pulse cursor-wait rounded border border-[var(--accent-10)] bg-[var(--accent-10)] px-6 text-white transition-all'
-                  : 'h-9 w-auto rounded border border-[var(--gray-8)] px-6 text-[var(--gray-12)] transition-all active:bg-[var(--accent-6)]'
-              } disabled:cursor-not-allowed disabled:bg-[var(--gray-5)]`}
-              aria-live="polite"
-            >
-              {buttonLabel}
-            </button>
+            <div>
+              <label
+                htmlFor="endRank"
+                className="mb-2 block text-sm text-[var(--gray-11)]"
+              >
+                분석 대상
+              </label>
+              <select
+                id="endRank"
+                value={endRank}
+                onChange={(e) => setEndRank(e.target.value)}
+                required
+                className="w-auto rounded border border-[var(--gray-4)] px-3 py-1.5 text-[var(--gray-12)] outline-none focus:border-[var(--accent-10)] focus:transition-all focus:duration-300"
+              >
+                <option value="10">상위 10명</option>
+                <option value="30">상위 30명</option>
+                <option value="50">상위 50명</option>
+                <option value="100">상위 100명</option>
+              </select>
+            </div>
+
+            <div className="flex items-end">
+              <button
+                type="submit"
+                disabled={isAnalyzing || isWaiting}
+                className={`${
+                  isWaiting
+                    ? 'h-9 w-auto animate-pulse cursor-wait rounded border border-[var(--accent-10)] bg-[var(--accent-10)] px-6 text-white transition-all'
+                    : 'h-9 w-auto rounded border border-[var(--gray-8)] px-6 text-[var(--gray-12)] transition-all active:bg-[var(--accent-6)]'
+                } disabled:cursor-not-allowed disabled:bg-[var(--gray-5)]`}
+                aria-live="polite"
+              >
+                {buttonLabel}
+              </button>
+            </div>
           </div>
         </div>
       </form>

@@ -188,6 +188,8 @@ async function authorizedFetch(
  * @param endRank 조회 종료 순위
  * @param job 직업 코드
  * @param enlightenmentTree 각인 이름
+ * @param minCombatPower 최소 전투력
+ * @param maxCombatPower 최대 전투력
  * @param callbacks UI 피드백을 위한 콜백 함수 객체
  * @returns 캐릭터 이름 배열을 담은 Promise
  */
@@ -196,6 +198,8 @@ export async function fetchRankNames(
   endRank: number,
   job: string,
   enlightenmentTree: string,
+  minCombatPower: number,
+  maxCombatPower: number,
   callbacks: ApiCallbacks,
 ): Promise<string[]> {
   if (startRank < 1 || endRank < startRank) return [];
@@ -214,6 +218,8 @@ export async function fetchRankNames(
       const params = new URLSearchParams({
         job,
         enlightenment_tree: enlightenmentTree,
+        min_combat_power: minCombatPower.toString(),
+        max_combat_power: maxCombatPower.toString(),
         limit: limit.toString(),
         page: page.toString(),
       });
