@@ -17,6 +17,7 @@ import type {
   PreparedCharacterData,
   ProgressState,
   TripodTableRow,
+  CoreMeta,
 } from './types';
 import { JOB_DATA } from '../../../config/jobData';
 import type { EnlightenmentTree } from '../../../config/jobData';
@@ -54,9 +55,9 @@ export default function SkillAnalyzer() {
   >([]);
   const [coreOptions, setCoreOptions] = useState<string[]>([]);
   const [coreOptionsByCategory, setCoreOptionsByCategory] = useState<{
-    sun: string[];
-    moon: string[];
-    star: string[];
+    sun: CoreMeta[];
+    moon: CoreMeta[];
+    star: CoreMeta[];
   }>({ sun: [], moon: [], star: [] });
   const [selectedCoresByCategory, setSelectedCoresByCategory] = useState<{
     sun?: string;
@@ -108,6 +109,24 @@ export default function SkillAnalyzer() {
     setRequiredCores([]);
   }, []);
 
+  /**
+   * 옵션 객체(예: { '10': '...', '14': '...', ... })를 툴팁 문자열로 변환합니다.
+   * - 존재하는 모든 키를 숫자 오름차순으로 정렬하여 "[키P] 설명" 형식으로 한 줄씩 나열합니다.
+   * - 예) 10, 14, 17, 18 ... 순으로 정렬되며, 특정 키(14/17 등)를 우선하지 않습니다.
+   * @param optionObj 각 코어의 포인트별 설명 맵 (키는 숫자 문자열, 값은 설명)
+   * @returns 개행(\n)으로 연결된 툴팁 문자열. 값이 없거나 optionObj가 없으면 빈 문자열
+   */
+  const buildCoreTooltip = (optionObj: Record<string, string> | undefined) => {
+    if (!optionObj) return '';
+    const orderedKeys = Object.keys(optionObj).sort(
+      (a, b) => Number(a) - Number(b),
+    );
+    const lines = orderedKeys
+      .map((k) => (optionObj[k] ? `[${k}P] ${optionObj[k]}` : undefined))
+      .filter((v): v is string => Boolean(v));
+    return lines.join('\n');
+  };
+
   // 직업(job) 선택이 변경되면 해당 직업의 각인 목록을 설정합니다.
   useEffect(() => {
     const selectedJobData = JOB_DATA.find((j) => j.code.toString() === job);
@@ -128,15 +147,27 @@ export default function SkillAnalyzer() {
     );
     if (selectedTreeData && (selectedTreeData as any).arkgrid) {
       const grid = (selectedTreeData as any).arkgrid as {
-        sun?: { name: string }[];
-        moon?: { name: string }[];
-        star?: { name: string }[];
+        sun?: { name: string; option?: Record<string, string> }[];
+        moon?: { name: string; option?: Record<string, string> }[];
+        star?: { name: string; option?: Record<string, string> }[];
       };
-      const sun = grid.sun?.map((c) => c.name) ?? [];
-      const moon = grid.moon?.map((c) => c.name) ?? [];
-      const star = grid.star?.map((c) => c.name) ?? [];
+      const sun: CoreMeta[] =
+        grid.sun?.map((c) => ({
+          name: c.name,
+          tooltip: buildCoreTooltip(c.option),
+        })) ?? [];
+      const moon: CoreMeta[] =
+        grid.moon?.map((c) => ({
+          name: c.name,
+          tooltip: buildCoreTooltip(c.option),
+        })) ?? [];
+      const star: CoreMeta[] =
+        grid.star?.map((c) => ({
+          name: c.name,
+          tooltip: buildCoreTooltip(c.option),
+        })) ?? [];
       setCoreOptionsByCategory({ sun, moon, star });
-      setCoreOptions([...sun, ...moon, ...star]);
+      setCoreOptions([...sun, ...moon, ...star].map((c) => c.name));
       setRequiredCores([]);
       setSelectedCoresByCategory({});
     } else {
@@ -149,9 +180,11 @@ export default function SkillAnalyzer() {
    * @param {string} core - 선택된 코어의 이름
    */
   const toggleCore = (core: string) => {
-    const category = coreOptionsByCategory.sun.includes(core)
+    const inSun = coreOptionsByCategory.sun.some((c) => c.name === core);
+    const inMoon = coreOptionsByCategory.moon.some((c) => c.name === core);
+    const category: 'sun' | 'moon' | 'star' = inSun
       ? 'sun'
-      : coreOptionsByCategory.moon.includes(core)
+      : inMoon
         ? 'moon'
         : 'star';
     setSelectedCoresByCategory((prev) => ({

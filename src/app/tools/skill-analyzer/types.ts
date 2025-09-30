@@ -1,3 +1,5 @@
+export type CoreMeta = { name: string; tooltip: string };
+
 export interface SkillUsageRow {
   skill_name: string;
   characters: number;

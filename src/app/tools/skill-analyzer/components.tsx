@@ -19,10 +19,10 @@ export const SectionHeader = ({
 );
 
 /**
- * 아크 그리드의 코어(해, 달, 별)를 선택하는 UI를 렌더링하는 컴포넌트입니다.
+ * 아크 그리드의 코어(해, 달, 별)를 선택하는 UI를 렌더링하는 컴포넌트입니다. (툴팁 지원)
  * @param {string} title - 코어 카테고리 제목 (e.g., "질서의 해 코어")
  * @param {'sun' | 'moon' | 'star'} category - 코어 카테고리
- * @param {string[]} cores - 해당 카테고리의 코어 이름 배열
+ * @param {{ name: string; tooltip: string }[]} cores - 해당 카테고리의 코어 배열
  * @param {string} [selectedCore] - 현재 선택된 코어
  * @param {(core: string) => void} onToggle - 코어 버튼 클릭 시 호출될 함수
  * @param {boolean} disabled - 컴포넌트 비활성화 여부
@@ -37,7 +37,7 @@ export const CoreCategorySelector = ({
 }: {
   title: string;
   category: 'sun' | 'moon' | 'star';
-  cores: string[];
+  cores: { name: string; tooltip: string }[];
   selectedCore?: string;
   onToggle: (core: string) => void;
   disabled: boolean;
@@ -48,19 +48,29 @@ export const CoreCategorySelector = ({
       {cores.length > 0 ? (
         <div className="flex flex-wrap gap-2">
           {cores.map((core) => (
-            <button
-              key={`${category}-${core}`}
-              type="button"
-              onClick={() => onToggle(core)}
-              disabled={disabled}
-              className={`rounded-full border px-3 py-1 text-xs transition-all ${
-                selectedCore === core
-                  ? 'border-[var(--accent-10)] bg-[var(--accent-9)] text-white'
-                  : 'border-[var(--gray-6)] bg-[var(--gray-1)] text-[var(--gray-11)] hover:bg-[var(--gray-4)]'
-              } ${!disabled ? '' : 'cursor-not-allowed opacity-50'}`}
-            >
-              {core}
-            </button>
+            <div key={`${category}-${core.name}`} className="group relative">
+              <button
+                type="button"
+                onClick={() => onToggle(core.name)}
+                disabled={disabled}
+                className={`rounded-full border px-3 py-1 text-xs transition-all ${
+                  selectedCore === core.name
+                    ? 'border-[var(--accent-10)] bg-[var(--accent-9)] text-white'
+                    : 'border-[var(--gray-6)] bg-[var(--gray-1)] text-[var(--gray-11)] hover:bg-[var(--gray-4)]'
+                } ${!disabled ? '' : 'cursor-not-allowed opacity-50'}`}
+              >
+                {core.name}
+              </button>
+              <div
+                role="tooltip"
+                className="pointer-events-none invisible absolute bottom-full left-1/2 z-50 w-72 -translate-x-1/2 -translate-y-2 whitespace-pre-wrap rounded-md border border-[var(--gray-6)] bg-[var(--gray-1)] p-3 text-[var(--gray-12)] opacity-0 shadow-lg transition-opacity duration-300 group-hover:visible group-hover:opacity-100"
+              >
+                <div className="mb-1 text-xs font-semibold text-[var(--gray-11)]">
+                  상세 효과
+                </div>
+                <div className="text-[11px] leading-5">{core.tooltip}</div>
+              </div>
+            </div>
           ))}
         </div>
       ) : (
