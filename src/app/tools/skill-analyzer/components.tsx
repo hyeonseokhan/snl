@@ -1,5 +1,7 @@
 'use client';
 
+import DOMPurify from 'dompurify';
+
 /**
  * 페이지의 각 구역(Section) 제목을 표시하는 컴포넌트입니다.
  * @param {string} title - 구역의 제목
@@ -47,31 +49,37 @@ export const CoreCategorySelector = ({
     <div className="flex min-h-12 items-center rounded-md border border-dashed border-[var(--gray-7)] p-2">
       {cores.length > 0 ? (
         <div className="flex flex-wrap gap-2">
-          {cores.map((core) => (
-            <div key={`${category}-${core.name}`} className="group relative">
-              <button
-                type="button"
-                onClick={() => onToggle(core.name)}
-                disabled={disabled}
-                className={`rounded-full border px-3 py-1 text-xs transition-all ${
-                  selectedCore === core.name
-                    ? 'border-[var(--accent-10)] bg-[var(--accent-9)] text-white'
-                    : 'border-[var(--gray-6)] bg-[var(--gray-1)] text-[var(--gray-11)] hover:bg-[var(--gray-4)]'
-                } ${!disabled ? '' : 'cursor-not-allowed opacity-50'}`}
-              >
-                {core.name}
-              </button>
-              <div
-                role="tooltip"
-                className="pointer-events-none invisible absolute bottom-full left-1/2 z-50 w-80 -translate-x-1/2 -translate-y-2 whitespace-pre-wrap rounded-md border border-[var(--gray-6)] bg-[var(--gray-1)] p-3 text-[var(--gray-12)] opacity-0 shadow-lg transition-opacity duration-300 group-hover:visible group-hover:opacity-100"
-              >
-                <div className="mb-1 text-xs font-semibold text-[var(--gray-11)]">
-                  상세 효과
+          {cores.map((core) => {
+            const sanitizedTooltip = DOMPurify.sanitize(core.tooltip);
+            return (
+              <div key={`${category}-${core.name}`} className="group relative">
+                <button
+                  type="button"
+                  onClick={() => onToggle(core.name)}
+                  disabled={disabled}
+                  className={`rounded-full border px-3 py-1 text-xs transition-all ${
+                    selectedCore === core.name
+                      ? 'border-[var(--accent-10)] bg-[var(--accent-9)] text-white'
+                      : 'border-[var(--gray-6)] bg-[var(--gray-1)] text-[var(--gray-11)] hover:bg-[var(--gray-4)]'
+                  } ${!disabled ? '' : 'cursor-not-allowed opacity-50'}`}
+                >
+                  {core.name}
+                </button>
+                <div
+                  role="tooltip"
+                  className="pointer-events-none invisible absolute bottom-full left-1/2 z-50 w-80 -translate-x-1/2 -translate-y-2 whitespace-pre-wrap rounded-md border border-[var(--gray-6)] bg-[var(--gray-1)] p-3 text-[var(--gray-12)] opacity-0 shadow-lg transition-opacity duration-300 group-hover:visible group-hover:opacity-100"
+                >
+                  <div className="mb-1 text-xs font-semibold text-[var(--gray-11)]">
+                    상세 효과
+                  </div>
+                  <div
+                    className="text-[11px] leading-5"
+                    dangerouslySetInnerHTML={{ __html: sanitizedTooltip }}
+                  />
                 </div>
-                <div className="text-[11px] leading-5">{core.tooltip}</div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       ) : (
         <div className="text-xs text-[var(--gray-9)]">-</div>

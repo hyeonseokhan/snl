@@ -122,7 +122,11 @@ export default function SkillAnalyzer() {
       (a, b) => Number(a) - Number(b),
     );
     const lines = orderedKeys
-      .map((k) => (optionObj[k] ? `[${k}P] ${optionObj[k]}` : undefined))
+      .map((k) =>
+        optionObj[k]
+          ? `<span style="color: var(--accent-11)">[${k}P]</span> ${optionObj[k]}`
+          : undefined,
+      )
       .filter((v): v is string => Boolean(v));
     return lines.join('\n');
   };
