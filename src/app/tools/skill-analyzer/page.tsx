@@ -32,6 +32,7 @@ import type {
 import { useTestMode } from '../../hooks/test-mode-context';
 import { JOB_DATA } from '../../../config/jobData';
 import type { EnlightenmentTree } from '../../../config/jobData';
+import React from 'react';
 
 const ANALYSIS_STEPS = 4;
 
@@ -75,6 +76,7 @@ const SearchForm = ({
   isAnalyzing,
   isWaiting,
   buttonLabel,
+  progress,
 }) => (
   <form
     onSubmit={handleFormSubmit}
@@ -196,16 +198,18 @@ const SearchForm = ({
           <button
             type="submit"
             disabled={isAnalyzing || isWaiting}
-            className={`${isWaiting
+            className={`${
+              isWaiting
                 ? 'h-9 w-auto animate-pulse cursor-wait rounded border border-[var(--accent-10)] bg-[var(--accent-10)] px-6 text-white transition-all'
                 : 'h-9 w-auto rounded border border-[var(--gray-8)] px-6 text-[var(--gray-12)] transition-all active:bg-[var(--accent-6)]'
-              } disabled:cursor-not-allowed disabled:bg-[var(--gray-5)]`}
+            } disabled:cursor-not-allowed disabled:bg-[var(--gray-5)]`}
             aria-live="polite"
           >
             {buttonLabel}
           </button>
         </div>
       </div>
+      <AnalysisProgress isAnalyzing={isAnalyzing} progress={progress} />
     </div>
   </form>
 );
@@ -216,7 +220,7 @@ const SearchForm = ({
 const AnalysisProgress = ({ isAnalyzing, progress }) => (
   <>
     {isAnalyzing && (
-      <div className="my-4 rounded-lg bg-[var(--gray-2)] p-4">
+      <div className="rounded-lg bg-[var(--gray-2)] p-4">
         <div className="mb-2 text-sm text-[var(--gray-11)]">
           {progress.message}
         </div>
@@ -244,7 +248,7 @@ const SearchFilters = ({
   coresEnabled,
 }) => (
   <>
-    {(isAnalyzing || preparedData.length > 0) && (
+    {(!isAnalyzing && preparedData.length > 0) && (
       <>
         <div className="block w-full flex-row border-t border-[var(--gray-5)] pb-3 pt-3 md:flex">
           <SectionHeader
@@ -305,164 +309,264 @@ const AnalysisResults = ({
   selectedSkill,
   setSelectedSkill,
   groupedTripodData,
-}) => (
-  <>
-    {results && (
-      <>
-        <div className="block w-full flex-row border-t border-[var(--gray-5)] pt-3 md:flex">
-          <SectionHeader
-            title="분석 결과 요약"
-            description="분석된 데이터의 주요 통계입니다."
-          />
-          <div className="grid w-full grid-cols-2 gap-4 md:w-9/12 md:grid-cols-4">
-            <StatCard
-              label="분석대상 캐릭터"
-              value={results.totalCharacters}
-            />
-            <StatCard
-              label="조건 부합 캐릭터"
-              value={results.keptCharacters.length}
-            />
-            <StatCard
-              label="추출된 트라이포드"
-              value={results.allRows.length}
-            />
-            <StatCard
-              label="고유 스킬"
-              value={results.skillUsageRows.length}
-            />
-          </div>
-        </div>
+  skillDetailStats,
+}) => {
+  const tierColorMap = {
+    1: 'text-[var(--blue-9)]',
+    2: 'text-[var(--green-9)]',
+    3: 'text-[var(--accent-11)]',
+  };
 
-        <div className="block w-full flex-row border-t border-[var(--gray-5)] pt-3 md:flex">
-          <SectionHeader
-            title="스킬 사용 통계"
-            description="랭커들의 스킬 채용률입니다."
-          />
-          <div className="w-full md:w-9/12">
-            <div className="w-full rounded-lg border border-dashed border-[var(--gray-8)] p-3">
-              <div className="flex border-b border-[var(--gray-5)] pb-3 text-sm text-[var(--gray-11)]">
-                <div className="flex-1 text-center">스킬명</div>
-                <div className="flex-1 text-center">사용 캐릭터 수</div>
-                <div className="flex-1 text-center">사용률</div>
-              </div>
-              {results.skillUsageRows.map((row) => (
-                <div
-                  key={row.skill_name}
-                  onClick={() => setSelectedSkill(row.skill_name)}
-                  className={`flex h-10 cursor-pointer items-center text-sm text-[var(--gray-11)] hover:bg-[var(--gray-4)] ${
-                    selectedSkill === row.skill_name
-                      ? 'bg-[var(--accent-6)]'
-                      : ''
-                    }`}
-                >
-                  <div className="flex-1 text-center font-medium">
-                    {row.skill_name}
-                  </div>
-                  <div className="flex-1 text-center">{row.characters}</div>
-                  <div className="flex-1 text-center">
-                    {results.keptCharacters.length > 0
-                      ? Math.round(
-                        (row.characters / results.keptCharacters.length) *
-                        100,
-                      )
-                      : 0}
-                    %
-                  </div>
-                </div>
-              ))}
+  return (
+    <>
+      {results && (
+        <>
+          <div className="block w-full flex-row border-t border-[var(--gray-5)] pt-3 md:flex">
+            <SectionHeader
+              title="분석 결과 요약"
+              description="분석된 데이터의 주요 통계입니다."
+            />
+            <div className="grid w-full grid-cols-2 gap-4 md:w-9/12 md:grid-cols-4">
+              <StatCard
+                label="분석대상 캐릭터"
+                value={results.totalCharacters}
+              />
+              <StatCard
+                label="조건 부합 캐릭터"
+                value={results.keptCharacters.length}
+              />
+              <StatCard
+                label="추출된 트라이포드"
+                value={results.allRows.length}
+              />
+              <StatCard
+                label="고유 스킬"
+                value={results.skillUsageRows.length}
+              />
             </div>
           </div>
-        </div>
 
-        <div className="block w-full flex-row border-t border-[var(--gray-5)] pt-3 md:flex">
-          <SectionHeader
-            title="캐릭터 스킬 상세"
-            description="캐릭터별 스킬, 레벨, 트라이포드, 룬 정보입니다."
-          />
-          <div className="w-full md:w-9/12">
-            <div className="w-full rounded-lg border border-dashed border-[var(--gray-8)] p-3">
-              <div className="flex border-b border-[var(--gray-5)] pb-3 text-xs font-semibold text-[var(--gray-11)]">
-                <div className="w-1/5 text-center">캐릭터</div>
-                <div className="flex w-4/5">
-                  <div className="w-3/12 text-center">스킬명</div>
-                  <div className="w-2/12 text-center">레벨</div>
-                  <div className="w-5/12 text-center">트라이포드</div>
-                  <div className="w-2/12 text-center">룬</div>
+          <div className="block w-full flex-row border-t border-[var(--gray-5)] pt-3 md:flex">
+            <SectionHeader
+              title="스킬 사용 통계"
+              description="랭커들의 스킬 채용률입니다."
+            />
+            <div className="w-full md:w-9/12">
+              <div className="w-full rounded-lg border border-dashed border-[var(--gray-8)] p-3">
+                <div className="flex border-b border-[var(--gray-5)] pb-3 text-sm text-[var(--gray-11)]">
+                  <div className="flex-1 text-center">스킬명</div>
+                  <div className="flex-1 text-center">사용 캐릭터 수</div>
+                  <div className="flex-1 text-center">사용률</div>
                 </div>
-              </div>
-              {Object.entries(groupedTripodData).map(
-                ([character, skills]: [string, any]) => {
-                  const skillEntries = Object.entries(skills);
-                  return (
+                {results.skillUsageRows.map((row) => (
+                  <React.Fragment key={row.skill_name}>
                     <div
-                      key={character}
-                      className={`flex border-b border-[var(--gray-4)] text-xs text-[var(--gray-11)] last:border-b-0`}
+                      onClick={() =>
+                        setSelectedSkill((prev) =>
+                          prev === row.skill_name ? null : row.skill_name,
+                        )
+                      }
+                      className={`flex h-10 cursor-pointer items-center text-sm text-[var(--gray-11)] hover:bg-[var(--gray-4)] ${
+                        selectedSkill === row.skill_name
+                          ? 'bg-[var(--accent-4)]'
+                          : ''
+                      }`}
                     >
-                      <div className="flex w-1/5 items-center justify-center border-r border-[var(--gray-4)] p-2 text-sm font-bold">
-                        <a
-                          href={`https://kloa.gg/characters/${encodeURIComponent(
-                            character,
-                          )}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-sky-600 decoration-from-font transition-colors hover:text-sky-700 hover:underline dark:text-sky-400 dark:hover:text-sky-300"
-                        >
-                          {character}
-                        </a>
+                      <div className="flex-1 text-center font-medium">
+                        {row.skill_name}
                       </div>
-                      <div className="w-4/5">
-                        {skillEntries.map(
-                          ([skillName, skillData]: [string, any], index) => (
-                            <div
-                              key={skillName}
-                              className={`flex min-h-10 items-center ${
-                                index < skillEntries.length - 1
-                                  ? 'border-b border-[var(--gray-4)]'
-                                  : ''
-                                } ${
-                                selectedSkill === skillName
-                                  ? 'bg-[var(--accent-6)]'
-                                  : ''
-                                }`}
-                            >
-                              <div className="w-3/12 p-2 text-center">
-                                {skillName}
-                              </div>
-                              <div className="w-2/12 p-2 text-center">
-                                {skillData.skill_level}
-                              </div>
-                              <div className="w-5/12 p-2 text-center text-xs">
-                                {skillData.tripods
-                                  ?.map(
-                                    (t: any) =>
-                                      `${(t.tier ?? 0) + 1}T-${t.name || ''}`,
-                                  )
-                                  .join(' / ') || '-'}
-                              </div>
-                              <div className="w-2/12 p-2 text-center">
-                                {skillData.rune_name || '-'}
-                              </div>
-                            </div>
-                          ),
-                        )}
+                      <div className="flex-1 text-center">{row.characters}</div>
+                      <div className="flex-1 text-center">
+                        {results.keptCharacters.length > 0
+                          ? Math.round(
+                              (row.characters / results.keptCharacters.length) *
+                                100,
+                            )
+                          : 0}
+                        %
                       </div>
                     </div>
-                  );
-                },
-              )}
+                    {selectedSkill === row.skill_name && skillDetailStats && (
+                      <div className="bg-[var(--gray-1)] p-4 text-xs">
+                        <div className="mb-3 text-sm font-bold text-[var(--gray-12)]">
+                          세부 통계 (총 {skillDetailStats.total}명 중)
+                        </div>
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                          <div>
+                            <h5 className="mb-1.5 font-semibold text-[var(--gray-12)]">
+                              스킬 레벨
+                            </h5>
+                            <ul className="space-y-1 text-[var(--gray-11)]">
+                              {[...skillDetailStats.skillLevels.entries()].map(
+                                ([level, count]) => (
+                                  <li key={level}>
+                                    - {level}레벨: {count}명 (
+                                    {(
+                                      (count / skillDetailStats.total) *
+                                      100
+                                    ).toFixed(1)}
+                                    %)
+                                  </li>
+                                ),
+                              )}
+                            </ul>
+                          </div>
+                          <div>
+                            <h5 className="mb-1.5 font-semibold text-[var(--gray-12)]">
+                              트라이포드
+                            </h5>
+                            <div className="space-y-2">
+                              {[...skillDetailStats.tripods.entries()].map(
+                                ([tier, tripodList]) => (
+                                  <div key={tier}>
+                                    <h6
+                                      className={`font-semibold ${
+                                        tierColorMap[tier]
+                                          ? tierColorMap[tier]
+                                          : 'text-[var(--gray-11)]'
+                                      }`}
+                                    >
+                                      {tier}티어
+                                    </h6>
+                                    <ul className="space-y-1 pl-2 text-[var(--gray-11)]">
+                                      {tripodList.map(({ name, count }) => (
+                                        <li key={name}>
+                                          - {name}: {count}명 (
+                                          {(
+                                            (count / skillDetailStats.total) *
+                                            100
+                                          ).toFixed(1)}
+                                          %)
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                ),
+                              )}
+                            </div>
+                          </div>
+                          <div>
+                            <h5 className="mb-1.5 font-semibold text-[var(--gray-12)]">
+                              룬
+                            </h5>
+                            <ul className="space-y-1 text-[var(--gray-11)]">
+                              {[...skillDetailStats.runes.entries()].map(
+                                ([rune, count]) => (
+                                  <li key={rune}>
+                                    - {rune}: {count}명 (
+                                    {(
+                                      (count / skillDetailStats.total) *
+                                      100
+                                    ).toFixed(1)}
+                                    %)
+                                  </li>
+                                ),
+                              )}
+                            </ul>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </React.Fragment>
+                ))}
+              </div>
             </div>
           </div>
-        </div>
-      </>
-    )}
-  </>
-);
+
+          <div className="block w-full flex-row border-t border-[var(--gray-5)] pt-3 md:flex">
+            <SectionHeader
+              title="캐릭터 스킬 상세"
+              description="캐릭터별 스킬, 레벨, 트라이포드, 룬 정보입니다."
+            />
+            <div className="w-full md:w-9/12">
+              <div className="w-full rounded-lg border border-dashed border-[var(--gray-8)] p-3">
+                <div className="flex border-b border-[var(--gray-5)] pb-3 text-xs font-semibold text-[var(--gray-11)]">
+                  <div className="w-1/5 text-center">캐릭터</div>
+                  <div className="flex w-4/5">
+                    <div className="w-3/12 text-center">스킬명</div>
+                    <div className="w-2/12 text-center">레벨</div>
+                    <div className="w-5/12 text-center">트라이포드</div>
+                    <div className="w-2/12 text-center">룬</div>
+                  </div>
+                </div>
+                {Object.entries(groupedTripodData).map(
+                  ([character, skills]: [string, any], characterIndex) => {
+                    const skillEntries = Object.entries(skills);
+                    return (
+                      <div
+                        key={character}
+                        className={`flex text-xs text-[var(--gray-11)] ${
+                          characterIndex > 0
+                            ? 'border-t-2 border-t-[var(--gray-6)]'
+                            : ''
+                        }`}
+                      >
+                        <div className="flex w-1/5 items-center justify-center border-r border-[var(--gray-4)] p-2 text-sm font-bold">
+                          <a
+                            href={`https://kloa.gg/characters/${encodeURIComponent(
+                              character,
+                            )}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sky-600 decoration-from-font transition-colors hover:text-sky-700 hover:underline dark:text-sky-400 dark:hover:text-sky-300"
+                          >
+                            {character}
+                          </a>
+                        </div>
+                        <div className="w-4/5">
+                          {skillEntries.map(
+                            ([skillName, skillData]: [string, any], index) => (
+                              <div
+                                key={skillName}
+                                className={`flex min-h-10 items-center ${
+                                  index < skillEntries.length - 1
+                                    ? 'border-b border-[var(--gray-4)]'
+                                    : ''
+                                } ${
+                                  selectedSkill === skillName
+                                    ? 'bg-[var(--accent-6)]'
+                                    : ''
+                                }`}
+                              >
+                                <div className="w-3/12 p-2 text-center">
+                                  {skillName}
+                                </div>
+                                <div className="w-2/12 p-2 text-center">
+                                  {skillData.skill_level}
+                                </div>
+                                <div className="w-5/12 p-2 text-center text-xs">
+                                  {skillData.tripods
+                                    ?.map(
+                                      (t: any) =>
+                                        `${(t.tier ?? 0) + 1}T-${t.name || ''}`,
+                                    )
+                                    .join(' / ') || '-'}
+                                </div>
+                                <div className="w-2/12 p-2 text-center">
+                                  {skillData.rune_name || '-'}
+                                </div>
+                              </div>
+                            ),
+                          )}
+                        </div>
+                      </div>
+                    );
+                  },
+                )}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+    </>
+  );
+};
 
 /**
  * 데이터 처리 과정에서 발생하는 로그를 표시하는 컴포넌트입니다.
  */
-const AnalysisLogs = ({ logs, logBoxRef }) => (  <>
+const AnalysisLogs = ({ logs, logBoxRef }) => (
+  <>
     {logs.length > 1 && (
       <div className="block w-full flex-row border-t border-[var(--gray-5)] pt-3 md:flex">
         <SectionHeader
@@ -659,8 +763,8 @@ export default function SkillAnalyzer() {
     const category: 'sun' | 'moon' | 'star' = inSun
       ? 'sun'
       : inMoon
-      ? 'moon'
-      : 'star';
+        ? 'moon'
+        : 'star';
     setSelectedCoresByCategory((prev) => ({
       ...prev,
       [category]:
@@ -736,7 +840,8 @@ export default function SkillAnalyzer() {
 
       for (const item of validData) {
         log(
-          `[완료] ${String(item.rank).padStart(2, '0')}. ${item.name} - ${item.rows.length
+          `[완료] ${String(item.rank).padStart(2, '0')}. ${item.name} - ${
+            item.rows.length
           }개의 트라이포드 추출`,
         );
       }
@@ -988,6 +1093,73 @@ export default function SkillAnalyzer() {
     }, {} as any);
   }, [results]);
 
+  const skillDetailStats = useMemo(() => {
+    if (!selectedSkill || !results) {
+      return null;
+    }
+
+    const skillLevels = new Map<number, number>();
+    const tripods = new Map<string, number>();
+    const runes = new Map<string, number>();
+
+    const charactersUsingSkill = Object.values(groupedTripodData).filter(
+      (skills: any) => skills[selectedSkill],
+    );
+
+    for (const skills of charactersUsingSkill) {
+      const skillData = (skills as any)[selectedSkill];
+      if (!skillData) continue;
+
+      skillLevels.set(
+        skillData.skill_level,
+        (skillLevels.get(skillData.skill_level) || 0) + 1,
+      );
+
+      if (skillData.rune_name) {
+        runes.set(
+          skillData.rune_name,
+          (runes.get(skillData.rune_name) || 0) + 1,
+        );
+      }
+
+      for (const tripod of skillData.tripods) {
+        const tripodKey = `${tripod.tier + 1}T-${tripod.name}`;
+        tripods.set(tripodKey, (tripods.get(tripodKey) || 0) + 1);
+      }
+    }
+
+    const sortedSkillLevels = new Map(
+      [...skillLevels.entries()].sort((a, b) => b[1] - a[1]),
+    );
+    const sortedTripods = new Map(
+      [...tripods.entries()].sort((a, b) => b[1] - a[1]),
+    );
+    const sortedRunes = new Map(
+      [...runes.entries()].sort((a, b) => b[1] - a[1]),
+    );
+
+    const tripodsByTier = new Map<number, { name: string; count: number }[]>();
+    for (const [tripodKey, count] of sortedTripods.entries()) {
+      const tier = parseInt(tripodKey.charAt(0), 10);
+      const name = tripodKey.substring(3);
+
+      if (!tripodsByTier.has(tier)) {
+        tripodsByTier.set(tier, []);
+      }
+      tripodsByTier.get(tier)!.push({ name, count });
+    }
+    const sortedTripodsByTier = new Map(
+      [...tripodsByTier.entries()].sort((a, b) => a[0] - b[0]),
+    );
+
+    return {
+      skillLevels: sortedSkillLevels,
+      tripods: sortedTripodsByTier,
+      runes: sortedRunes,
+      total: charactersUsingSkill.length,
+    };
+  }, [selectedSkill, results, groupedTripodData]);
+
   const coresEnabled = preparedData.length > 0;
   const isWaiting = quotaBanner.active;
   const waitingPct = isWaiting
@@ -1020,9 +1192,8 @@ export default function SkillAnalyzer() {
         isAnalyzing={isAnalyzing}
         isWaiting={isWaiting}
         buttonLabel={buttonLabel}
+        progress={progress}
       />
-
-      <AnalysisProgress isAnalyzing={isAnalyzing} progress={progress} />
 
       <SearchFilters
         isAnalyzing={isAnalyzing}
@@ -1039,6 +1210,7 @@ export default function SkillAnalyzer() {
         selectedSkill={selectedSkill}
         setSelectedSkill={setSelectedSkill}
         groupedTripodData={groupedTripodData}
+        skillDetailStats={skillDetailStats}
       />
 
       <AnalysisLogs logs={logs} logBoxRef={logBoxRef} />

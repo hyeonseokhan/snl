@@ -31,7 +31,8 @@
     "resolveJsonModule": true,
     "strict": false,
     "target": "es5",
-    "strictNullChecks": true
+    "strictNullChecks": true,
+    "downlevelIteration": true
   },
   "include": [
     "src",
