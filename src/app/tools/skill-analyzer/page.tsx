@@ -1,8 +1,18 @@
+/**
+ * @file Skill Analyzer 페이지의 메인 로직을 담당하는 파일입니다.
+ * 이 파일은 다음과 같은 주요 기능들을 포함합니다:
+ * - 상태 관리: 직업, 각인, 전투력 등 사용자 입력과 분석 결과, 로그 등 모든 상태를 관리합니다.
+ * - 데이터 페칭: 로스트아크 API 또는 IndexedDB 캐시에서 캐릭터 데이터를 가져옵니다.
+ * - 데이터 처리: 가져온 데이터를 분석에 적합한 형태로 가공하고, 필터링 및 통계 계산을 수행합니다.
+ * - 렌더링: 하위 컴포넌트(검색 폼, 필터, 결과, 로그)에 필요한 데이터와 핸들러를 전달하여 UI를 렌더링합니다.
+ */
+
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { SectionHeader, CoreCategorySelector, StatCard } from './components';
 import { fetchRankNames, fetchArmories, CONCURRENCY_ARMORY } from './api';
+import { idbGetAllArmories } from './cache';
 import {
   aggregateSkillUsageByCharacter,
   deepCleanHtml,
@@ -19,13 +29,467 @@ import type {
   TripodTableRow,
   CoreMeta,
 } from './types';
+import { useTestMode } from '../../hooks/test-mode-context';
 import { JOB_DATA } from '../../../config/jobData';
 import type { EnlightenmentTree } from '../../../config/jobData';
 
 const ANALYSIS_STEPS = 4;
 
 /**
+ * 캐릭터의 전투정보실(armory) 데이터를 받아 분석에 필요한 형태로 가공합니다.
+ * @param name 캐릭터 이름
+ * @param armory API 또는 캐시에서 가져온 캐릭터 데이터
+ * @returns 가공된 캐릭터 데이터 객체 (PreparedCharacterData)
+ */
+const prepareCharacterDataFromArmory = (
+  name: string,
+  armory: any,
+): PreparedCharacterData => {
+  if (!armory) {
+    return { name, rows: [], usedSkills: new Set(), arkgridSet: new Set() };
+  }
+  const skillsClean = deepCleanHtml(armory.ArmorySkills || []);
+  const rows = extractSelectedRows(name, skillsClean);
+  const usedSkills = aggregateSkillUsageByCharacter(skillsClean);
+  const arkgridSet = extractArkgridSlotNameSet(armory);
+  return { name, rows, usedSkills, arkgridSet };
+};
+
+/**
+ * 검색 폼 UI를 렌더링하는 컴포넌트입니다.
+ * 직업, 각인, 전투력, 순위 등 검색 조건을 입력받습니다.
+ */
+const SearchForm = ({
+  handleFormSubmit,
+  job,
+  setJob,
+  enlightenmentTree,
+  setEnlightenmentTree,
+  enlightenmentOptions,
+  minCombatPower,
+  setMinCombatPower,
+  maxCombatPower,
+  setMaxCombatPower,
+  endRank,
+  setEndRank,
+  isAnalyzing,
+  isWaiting,
+  buttonLabel,
+}) => (
+  <form
+    onSubmit={handleFormSubmit}
+    className="block w-full flex-row pb-3 md:flex"
+  >
+    <SectionHeader
+      title="검색 정보 입력"
+      description="직업, 각인, 대상 수 등을 설정합니다."
+    />
+    <div className="flex w-full flex-col gap-4 md:w-9/12">
+      {/* Row 1 */}
+      <div className="flex flex-wrap items-end gap-4">
+        <div>
+          <label
+            htmlFor="job"
+            className="mb-2 block text-sm text-[var(--gray-11)]"
+          >
+            직업 선택
+          </label>
+          <select
+            id="job"
+            value={job}
+            onChange={(e) => setJob(e.target.value)}
+            required
+            className="h-9 w-auto rounded border border-[var(--gray-4)] px-3 text-[var(--gray-12)] outline-none focus:border-[var(--accent-10)] focus:transition-all focus:duration-300"
+          >
+            <option value="">직업을 선택하세요</option>
+            {JOB_DATA.map((j) => (
+              <option key={j.code} value={j.code}>
+                {j.class}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label
+            htmlFor="enlightenmentTree"
+            className="mb-2 block text-sm text-[var(--gray-11)]"
+          >
+            직업 각인
+          </label>
+          <select
+            id="enlightenmentTree"
+            value={enlightenmentTree}
+            onChange={(e) => setEnlightenmentTree(e.target.value)}
+            required
+            disabled={!job}
+            className="h-9 w-auto rounded border border-[var(--gray-4)] px-3 text-[var(--gray-12)] outline-none focus:border-[var(--accent-10)] focus:transition-all focus:duration-300 disabled:bg-[var(--gray-1)]"
+          >
+            <option value="">직업을 먼저 선택하세요</option>
+            {enlightenmentOptions.map((tree) => (
+              <option key={tree.name} value={tree.name}>
+                {tree.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* Row 2 */}
+      <div className="flex flex-wrap items-end gap-4">
+        <div>
+          <label
+            htmlFor="minCombatPower"
+            className="mb-2 block text-sm text-[var(--gray-11)]"
+          >
+            최소 전투력
+          </label>
+          <input
+            id="minCombatPower"
+            type="number"
+            value={minCombatPower}
+            onChange={(e) => setMinCombatPower(e.target.value)}
+            className="h-9 w-24 rounded border border-[var(--gray-4)] px-3 text-[var(--gray-12)] outline-none focus:border-[var(--accent-10)] focus:transition-all focus:duration-300"
+            placeholder="0"
+          />
+        </div>
+
+        <div>
+          <label
+            htmlFor="maxCombatPower"
+            className="mb-2 block text-sm text-[var(--gray-11)]"
+          >
+            최대 전투력
+          </label>
+          <input
+            id="maxCombatPower"
+            type="number"
+            value={maxCombatPower}
+            onChange={(e) => setMaxCombatPower(e.target.value)}
+            className="h-9 w-24 rounded border border-[var(--gray-4)] px-3 text-[var(--gray-12)] outline-none focus:border-[var(--accent-10)] focus:transition-all focus:duration-300"
+            placeholder="9999"
+          />
+        </div>
+
+        <div>
+          <label
+            htmlFor="endRank"
+            className="mb-2 block text-sm text-[var(--gray-11)]"
+          >
+            분석 대상
+          </label>
+          <select
+            id="endRank"
+            value={endRank}
+            onChange={(e) => setEndRank(e.target.value)}
+            required
+            className="h-9 w-auto rounded border border-[var(--gray-4)] px-3 text-[var(--gray-12)] outline-none focus:border-[var(--accent-10)] focus:transition-all focus:duration-300"
+          >
+            <option value="10">상위 10명</option>
+            <option value="30">상위 30명</option>
+            <option value="50">상위 50명</option>
+            <option value="100">상위 100명</option>
+          </select>
+        </div>
+
+        <div className="flex items-end">
+          <button
+            type="submit"
+            disabled={isAnalyzing || isWaiting}
+            className={`${isWaiting
+                ? 'h-9 w-auto animate-pulse cursor-wait rounded border border-[var(--accent-10)] bg-[var(--accent-10)] px-6 text-white transition-all'
+                : 'h-9 w-auto rounded border border-[var(--gray-8)] px-6 text-[var(--gray-12)] transition-all active:bg-[var(--accent-6)]'
+              } disabled:cursor-not-allowed disabled:bg-[var(--gray-5)]`}
+            aria-live="polite"
+          >
+            {buttonLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  </form>
+);
+
+/**
+ * 분석 진행 상태를 보여주는 프로그레스 바 컴포넌트입니다.
+ */
+const AnalysisProgress = ({ isAnalyzing, progress }) => (
+  <>
+    {isAnalyzing && (
+      <div className="my-4 rounded-lg bg-[var(--gray-2)] p-4">
+        <div className="mb-2 text-sm text-[var(--gray-11)]">
+          {progress.message}
+        </div>
+        <div className="h-2 w-full rounded-full bg-[var(--gray-5)]">
+          <div
+            className="h-2 rounded-full bg-[var(--accent-9)] transition-all duration-500"
+            style={{ width: `${(progress.current / progress.total) * 100}%` }}
+          ></div>
+        </div>
+      </div>
+    )}
+  </>
+);
+
+/**
+ * 상세 필터링을 위한 코어 선택 UI를 렌더링하는 컴포넌트입니다.
+ */
+const SearchFilters = ({
+  isAnalyzing,
+  preparedData,
+  coreOptions,
+  coreOptionsByCategory,
+  selectedCoresByCategory,
+  toggleCore,
+  coresEnabled,
+}) => (
+  <>
+    {(isAnalyzing || preparedData.length > 0) && (
+      <>
+        <div className="block w-full flex-row border-t border-[var(--gray-5)] pb-3 pt-3 md:flex">
+          <SectionHeader
+            title="조건 상세"
+            description="사용 코어를 선택해 조건을 세부 설정합니다."
+          />
+          <div className="w-full md:w-9/12">
+            <div className="inline-flex w-fit max-w-full flex-col gap-3 self-start md:w-auto">
+              {coreOptions.length > 0 ? (
+                <>
+                  <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-4">
+                    <div className="flex flex-col gap-3 md:flex-row md:flex-wrap">
+                      <CoreCategorySelector
+                        title="질서의 해 코어"
+                        category="sun"
+                        cores={coreOptionsByCategory.sun}
+                        selectedCore={selectedCoresByCategory.sun}
+                        onToggle={toggleCore}
+                        disabled={!coresEnabled}
+                      />
+                      <CoreCategorySelector
+                        title="질서의 달 코어"
+                        category="moon"
+                        cores={coreOptionsByCategory.moon}
+                        selectedCore={selectedCoresByCategory.moon}
+                        onToggle={toggleCore}
+                        disabled={!coresEnabled}
+                      />
+                      <CoreCategorySelector
+                        title="질서의 별 코어"
+                        category="star"
+                        cores={coreOptionsByCategory.star}
+                        selectedCore={selectedCoresByCategory.star}
+                        onToggle={toggleCore}
+                        disabled={!coresEnabled}
+                      />
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <span className="text-sm text-[var(--gray-9)]">
+                  직업 각인를 선택하면 코어가 표시됩니다.
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      </>
+    )}
+  </>
+);
+
+/**
+ * 분석 결과를 요약, 스킬 통계, 캐릭터별 상세 정보로 나누어 렌더링하는 컴포넌트입니다.
+ */
+const AnalysisResults = ({
+  results,
+  selectedSkill,
+  setSelectedSkill,
+  groupedTripodData,
+}) => (
+  <>
+    {results && (
+      <>
+        <div className="block w-full flex-row border-t border-[var(--gray-5)] pt-3 md:flex">
+          <SectionHeader
+            title="분석 결과 요약"
+            description="분석된 데이터의 주요 통계입니다."
+          />
+          <div className="grid w-full grid-cols-2 gap-4 md:w-9/12 md:grid-cols-4">
+            <StatCard
+              label="분석대상 캐릭터"
+              value={results.totalCharacters}
+            />
+            <StatCard
+              label="조건 부합 캐릭터"
+              value={results.keptCharacters.length}
+            />
+            <StatCard
+              label="추출된 트라이포드"
+              value={results.allRows.length}
+            />
+            <StatCard
+              label="고유 스킬"
+              value={results.skillUsageRows.length}
+            />
+          </div>
+        </div>
+
+        <div className="block w-full flex-row border-t border-[var(--gray-5)] pt-3 md:flex">
+          <SectionHeader
+            title="스킬 사용 통계"
+            description="랭커들의 스킬 채용률입니다."
+          />
+          <div className="w-full md:w-9/12">
+            <div className="w-full rounded-lg border border-dashed border-[var(--gray-8)] p-3">
+              <div className="flex border-b border-[var(--gray-5)] pb-3 text-sm text-[var(--gray-11)]">
+                <div className="flex-1 text-center">스킬명</div>
+                <div className="flex-1 text-center">사용 캐릭터 수</div>
+                <div className="flex-1 text-center">사용률</div>
+              </div>
+              {results.skillUsageRows.map((row) => (
+                <div
+                  key={row.skill_name}
+                  onClick={() => setSelectedSkill(row.skill_name)}
+                  className={`flex h-10 cursor-pointer items-center text-sm text-[var(--gray-11)] hover:bg-[var(--gray-4)] ${
+                    selectedSkill === row.skill_name
+                      ? 'bg-[var(--accent-6)]'
+                      : ''
+                    }`}
+                >
+                  <div className="flex-1 text-center font-medium">
+                    {row.skill_name}
+                  </div>
+                  <div className="flex-1 text-center">{row.characters}</div>
+                  <div className="flex-1 text-center">
+                    {results.keptCharacters.length > 0
+                      ? Math.round(
+                        (row.characters / results.keptCharacters.length) *
+                        100,
+                      )
+                      : 0}
+                    %
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="block w-full flex-row border-t border-[var(--gray-5)] pt-3 md:flex">
+          <SectionHeader
+            title="캐릭터 스킬 상세"
+            description="캐릭터별 스킬, 레벨, 트라이포드, 룬 정보입니다."
+          />
+          <div className="w-full md:w-9/12">
+            <div className="w-full rounded-lg border border-dashed border-[var(--gray-8)] p-3">
+              <div className="flex border-b border-[var(--gray-5)] pb-3 text-xs font-semibold text-[var(--gray-11)]">
+                <div className="w-1/5 text-center">캐릭터</div>
+                <div className="flex w-4/5">
+                  <div className="w-3/12 text-center">스킬명</div>
+                  <div className="w-2/12 text-center">레벨</div>
+                  <div className="w-5/12 text-center">트라이포드</div>
+                  <div className="w-2/12 text-center">룬</div>
+                </div>
+              </div>
+              {Object.entries(groupedTripodData).map(
+                ([character, skills]: [string, any]) => {
+                  const skillEntries = Object.entries(skills);
+                  return (
+                    <div
+                      key={character}
+                      className={`flex border-b border-[var(--gray-4)] text-xs text-[var(--gray-11)] last:border-b-0`}
+                    >
+                      <div className="flex w-1/5 items-center justify-center border-r border-[var(--gray-4)] p-2 text-sm font-bold">
+                        <a
+                          href={`https://kloa.gg/characters/${encodeURIComponent(
+                            character,
+                          )}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sky-600 decoration-from-font transition-colors hover:text-sky-700 hover:underline dark:text-sky-400 dark:hover:text-sky-300"
+                        >
+                          {character}
+                        </a>
+                      </div>
+                      <div className="w-4/5">
+                        {skillEntries.map(
+                          ([skillName, skillData]: [string, any], index) => (
+                            <div
+                              key={skillName}
+                              className={`flex min-h-10 items-center ${
+                                index < skillEntries.length - 1
+                                  ? 'border-b border-[var(--gray-4)]'
+                                  : ''
+                                } ${
+                                selectedSkill === skillName
+                                  ? 'bg-[var(--accent-6)]'
+                                  : ''
+                                }`}
+                            >
+                              <div className="w-3/12 p-2 text-center">
+                                {skillName}
+                              </div>
+                              <div className="w-2/12 p-2 text-center">
+                                {skillData.skill_level}
+                              </div>
+                              <div className="w-5/12 p-2 text-center text-xs">
+                                {skillData.tripods
+                                  ?.map(
+                                    (t: any) =>
+                                      `${(t.tier ?? 0) + 1}T-${t.name || ''}`,
+                                  )
+                                  .join(' / ') || '-'}
+                              </div>
+                              <div className="w-2/12 p-2 text-center">
+                                {skillData.rune_name || '-'}
+                              </div>
+                            </div>
+                          ),
+                        )}
+                      </div>
+                    </div>
+                  );
+                },
+              )}
+            </div>
+          </div>
+        </div>
+      </>
+    )}
+  </>
+);
+
+/**
+ * 데이터 처리 과정에서 발생하는 로그를 표시하는 컴포넌트입니다.
+ */
+const AnalysisLogs = ({ logs, logBoxRef }) => (  <>
+    {logs.length > 1 && (
+      <div className="block w-full flex-row border-t border-[var(--gray-5)] pt-3 md:flex">
+        <SectionHeader
+          title="분석 로그"
+          description="API 요청 및 데이터 처리 과정의 로그입니다."
+        />
+        <div className="w-full md:w-9/12">
+          <div
+            ref={logBoxRef}
+            className="max-h-60 overflow-y-auto rounded-lg bg-[var(--gray-1)] p-4 font-mono text-xs text-[var(--gray-11)]"
+          >
+            {logs.map((logMsg, i) => (
+              <div key={i}>{logMsg}</div>
+            ))}
+          </div>
+        </div>
+      </div>
+    )}
+  </>
+);
+
+/**
  * 로스트아크 전투력 랭킹을 기반으로 스킬 및 트라이포드 사용 통계를 분석하는 페이지 컴포넌트입니다.
+ */
+/**
+ * 로스트아크 전투력 랭킹을 기반으로 스킬 및 트라이포드 사용 통계를 분석하는 페이지 컴포넌트입니다.
+ * 모든 상태 관리와 핵심 로직 실행을 담당하며, 하위 UI 컴포넌트를 조립합니다.
  */
 export default function SkillAnalyzer() {
   const [job, setJob] = useState('');
@@ -35,6 +499,7 @@ export default function SkillAnalyzer() {
   const [maxCombatPower, setMaxCombatPower] = useState('9999');
   const [requiredCores, setRequiredCores] = useState<string[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const { isTestMode } = useTestMode();
   const [progress, setProgress] = useState<ProgressState>({
     current: 0,
     total: 0,
@@ -185,14 +650,17 @@ export default function SkillAnalyzer() {
    * 코어 선택 버튼을 토글(선택/해제)하는 함수입니다.
    * @param {string} core - 선택된 코어의 이름
    */
+  /**
+   * 코어 선택 버튼을 토글(선택/해제)하는 함수입니다.
+   */
   const toggleCore = (core: string) => {
     const inSun = coreOptionsByCategory.sun.some((c) => c.name === core);
     const inMoon = coreOptionsByCategory.moon.some((c) => c.name === core);
     const category: 'sun' | 'moon' | 'star' = inSun
       ? 'sun'
       : inMoon
-        ? 'moon'
-        : 'star';
+      ? 'moon'
+      : 'star';
     setSelectedCoresByCategory((prev) => ({
       ...prev,
       [category]:
@@ -226,27 +694,26 @@ export default function SkillAnalyzer() {
    * @param {number} startRank - 분석 시작 순위 (로그 표기용)
    * @returns {Promise<PreparedCharacterData[]>} - 가공된 캐릭터 데이터 배열을 담은 Promise
    */
+  /**
+   * 캐릭터 이름 목록을 받아, 각 캐릭터의 상세 정보를 API로 조회하고 분석에 필요한 형태로 가공합니다.
+   */
   const fetchAndPrepareCharacterData = useCallback(
     async (names: string[], startRank: number) => {
-      const prepared: PreparedCharacterData[] = [];
       let completed = 0;
 
-      const results = await mapPool<
+      const characterData = await mapPool<
         string,
         (PreparedCharacterData & { rank: number }) | undefined
       >(names, CONCURRENCY_ARMORY, async (name, i) => {
         const rank = startRank + i;
         try {
           const armory = await fetchArmories(name, apiCallbacks);
-          if (!armory) {
+          const prepared = prepareCharacterDataFromArmory(name, armory);
+          if (prepared.rows.length === 0) {
             log(`[실패] ${name}님의 정보를 가져오지 못했습니다.`);
             return undefined;
           }
-          const skillsClean = deepCleanHtml(armory.ArmorySkills || []);
-          const rows = extractSelectedRows(name, skillsClean);
-          const usedSkills = aggregateSkillUsageByCharacter(skillsClean);
-          const arkgridSet = extractArkgridSlotNameSet(armory);
-          return { name, rows, usedSkills, arkgridSet, rank };
+          return { ...prepared, rank };
         } catch (error: any) {
           log(
             `[오류] ${rank.toString().padStart(2, '0')}. ${name} - 실패: ${error.message}`,
@@ -263,26 +730,25 @@ export default function SkillAnalyzer() {
         }
       });
 
-      for (const item of results) {
-        if (item) {
-          prepared.push({
-            name: item.name,
-            rows: item.rows,
-            usedSkills: item.usedSkills,
-            arkgridSet: item.arkgridSet,
-          });
-          log(
-            `[완료] ${String(item.rank).padStart(2, '0')}. ${item.name} - ${item.rows.length}개의 트라이포드 추출`,
-          );
-        }
+      const validData = characterData.filter(
+        (d): d is PreparedCharacterData & { rank: number } => !!d,
+      );
+
+      for (const item of validData) {
+        log(
+          `[완료] ${String(item.rank).padStart(2, '0')}. ${item.name} - ${item.rows.length
+          }개의 트라이포드 추출`,
+        );
       }
 
-      return prepared;
+      return validData;
     },
     [apiCallbacks, log],
   );
 
-  // 폼 제출 시 실행되는 메인 로직: 랭커 목록 조회 > 캐릭터별 상세 정보 조회의 순서로 데이터를 수집합니다.
+  /**
+   * API를 통해 랭커 목록 조회부터 캐릭터별 상세 정보 조회까지 데이터 수집의 전체 과정을 담당합니다.
+   */
   const acquireRankAndCharacters = useCallback(
     async (
       startRank: number,
@@ -331,10 +797,94 @@ export default function SkillAnalyzer() {
     [apiCallbacks, log, fetchAndPrepareCharacterData],
   );
 
+  /**
+   * 테스트 모드 시, IndexedDB에 캐시된 모든 캐릭터 데이터를 불러와 분석을 준비합니다.
+   */
+  const loadDataFromCache = useCallback(async () => {
+    log('테스트 모드: IndexedDB에서 데이터 로드를 시작합니다.');
+    setIsAnalyzing(true);
+    resetAnalysisState();
+
+    try {
+      const cachedArmories = await idbGetAllArmories();
+      if (!cachedArmories || cachedArmories.length === 0) {
+        log(
+          '캐시된 데이터가 없습니다. API를 통해 먼저 데이터를 수집해주세요.',
+          'error',
+        );
+        alert('IndexedDB에 캐시된 데이터가 없습니다.');
+        setIsAnalyzing(false);
+        return;
+      }
+
+      log(`캐시 데이터 로드 완료: ${cachedArmories.length}명`);
+      setTotalRanked(cachedArmories.length);
+      setProgress({
+        current: 1,
+        total: ANALYSIS_STEPS,
+        message: '캐릭터 데이터 처리 중...',
+      });
+
+      const prepared: PreparedCharacterData[] = [];
+      let completed = 0;
+
+      for (const armoryData of cachedArmories) {
+        const { name, data: armory } = armoryData;
+        try {
+          const preparedData = prepareCharacterDataFromArmory(name, armory);
+          if (preparedData.rows.length > 0) {
+            prepared.push(preparedData);
+            log(
+              `[캐시] ${String(completed + 1).padStart(2, '0')}. ${name} - ${
+                preparedData.rows.length
+              }개의 트라이포드 추출`,
+            );
+          } else {
+            log(`[실패] ${name}님의 정보가 캐시에 비어있습니다.`);
+          }
+        } catch (error: any) {
+          log(
+            `[오류] ${String(completed + 1).padStart(2, '0')}. ${name} - 실패: ${
+              error.message
+            }`,
+            'error',
+          );
+        } finally {
+          completed += 1;
+          setProgress({
+            current: completed,
+            total: cachedArmories.length,
+            message: `캐릭터 데이터 처리 중... (${completed}/${cachedArmories.length})`,
+          });
+        }
+      }
+
+      setPreparedData(prepared);
+      setProgress({ current: 4, total: ANALYSIS_STEPS, message: '완료' });
+      log(
+        '캐시 데이터 처리가 완료되었습니다. 조건을 선택하면 통계를 즉시 갱신합니다.',
+      );
+    } catch (error: any) {
+      log(`테스트 모드 오류: ${error.message}`, 'error');
+      alert(`테스트 모드 실행 중 오류가 발생했습니다: ${error.message}`);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  }, [log, resetAnalysisState]);
   // 사용자가 '검색 시작' 버튼을 눌렀을 때 폼 제출을 처리하는 이벤트 핸들러입니다.
+  /**
+   * 사용자가 '검색 시작' 버튼을 눌렀을 때 폼 제출을 처리하는 메인 이벤트 핸들러입니다.
+   * 테스트 모드 여부에 따라 `loadDataFromCache` 또는 `acquireRankAndCharacters`를 호출합니다.
+   */
   const handleFormSubmit = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
+
+      if (isTestMode) {
+        await loadDataFromCache();
+        return;
+      }
+
       if (!job || !enlightenmentTree) {
         alert('직업과 직업 각인를 모두 선택해주세요.');
         return;
@@ -370,10 +920,12 @@ export default function SkillAnalyzer() {
       resetAnalysisState,
       acquireRankAndCharacters,
       log,
+      isTestMode,
+      loadDataFromCache,
     ],
   );
 
-  // 준비된 데이터(preparedData)나 필요 코어(requiredCores)가 변경될 때마다 실시간으로 통계 결과를 필터링하고 계산합니다.
+  // `preparedData` 또는 `requiredCores`가 변경될 때마다 실시간으로 통계 결과를 필터링하고 계산합니다。
   useEffect(() => {
     if (!preparedData || preparedData.length === 0) {
       setResults(null);
@@ -413,6 +965,7 @@ export default function SkillAnalyzer() {
   }, [requiredCores, preparedData, totalRanked]);
 
   // 최종 분석 결과를 캐릭터별, 스킬별로 그룹화하여 상세 테이블에 표시하기 쉽게 가공합니다.
+  // 최종 분석 결과를 캐릭터별, 스킬별로 그룹화하여 상세 테이블에 표시하기 쉽게 가공합니다.
   const groupedTripodData = useMemo(() => {
     if (!results) return {};
     return results.allRows.reduce((acc, row) => {
@@ -451,371 +1004,44 @@ export default function SkillAnalyzer() {
 
   return (
     <div className="flex w-full flex-col gap-y-4 rounded-lg bg-[var(--gray-3)] p-5">
-      <form
-        onSubmit={handleFormSubmit}
-        className="block w-full flex-row border-b border-[var(--gray-5)] pb-3 md:flex"
-      >
-        <SectionHeader
-          title="검색 정보 입력"
-          description="직업, 각인, 대상 수 등을 설정합니다."
-        />
-        <div className="flex w-full flex-col gap-4 md:w-9/12">
-          {/* Row 1 */}
-          <div className="flex flex-wrap items-end gap-4">
-            <div>
-              <label
-                htmlFor="job"
-                className="mb-2 block text-sm text-[var(--gray-11)]"
-              >
-                직업 선택
-              </label>
-              <select
-                id="job"
-                value={job}
-                onChange={(e) => setJob(e.target.value)}
-                required
-                className="w-auto rounded border border-[var(--gray-4)] px-3 py-1.5 text-[var(--gray-12)] outline-none focus:border-[var(--accent-10)] focus:transition-all focus:duration-300"
-              >
-                <option value="">직업을 선택하세요</option>
-                {JOB_DATA.map((j) => (
-                  <option key={j.code} value={j.code}>
-                    {j.class}
-                  </option>
-                ))}
-              </select>
-            </div>
+      <SearchForm
+        handleFormSubmit={handleFormSubmit}
+        job={job}
+        setJob={setJob}
+        enlightenmentTree={enlightenmentTree}
+        setEnlightenmentTree={setEnlightenmentTree}
+        enlightenmentOptions={enlightenmentOptions}
+        minCombatPower={minCombatPower}
+        setMinCombatPower={setMinCombatPower}
+        maxCombatPower={maxCombatPower}
+        setMaxCombatPower={setMaxCombatPower}
+        endRank={endRank}
+        setEndRank={setEndRank}
+        isAnalyzing={isAnalyzing}
+        isWaiting={isWaiting}
+        buttonLabel={buttonLabel}
+      />
 
-            <div>
-              <label
-                htmlFor="enlightenmentTree"
-                className="mb-2 block text-sm text-[var(--gray-11)]"
-              >
-                직업 각인
-              </label>
-              <select
-                id="enlightenmentTree"
-                value={enlightenmentTree}
-                onChange={(e) => setEnlightenmentTree(e.target.value)}
-                required
-                disabled={!job}
-                className="w-auto rounded border border-[var(--gray-4)] px-3 py-1.5 text-[var(--gray-12)] outline-none focus:border-[var(--accent-10)] focus:transition-all focus:duration-300 disabled:bg-[var(--gray-1)]"
-              >
-                <option value="">직업을 먼저 선택하세요</option>
-                {enlightenmentOptions.map((tree) => (
-                  <option key={tree.name} value={tree.name}>
-                    {tree.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
+      <AnalysisProgress isAnalyzing={isAnalyzing} progress={progress} />
 
-          {/* Row 2 */}
-          <div className="flex flex-wrap items-end gap-4">
-            <div>
-              <label
-                htmlFor="minCombatPower"
-                className="mb-2 block text-sm text-[var(--gray-11)]"
-              >
-                최소 전투력
-              </label>
-              <input
-                id="minCombatPower"
-                type="number"
-                value={minCombatPower}
-                onChange={(e) => setMinCombatPower(e.target.value)}
-                className="w-24 rounded border border-[var(--gray-4)] px-3 py-1.5 text-[var(--gray-12)] outline-none focus:border-[var(--accent-10)] focus:transition-all focus:duration-300"
-                placeholder="0"
-              />
-            </div>
+      <SearchFilters
+        isAnalyzing={isAnalyzing}
+        preparedData={preparedData}
+        coreOptions={coreOptions}
+        coreOptionsByCategory={coreOptionsByCategory}
+        selectedCoresByCategory={selectedCoresByCategory}
+        toggleCore={toggleCore}
+        coresEnabled={coresEnabled}
+      />
 
-            <div>
-              <label
-                htmlFor="maxCombatPower"
-                className="mb-2 block text-sm text-[var(--gray-11)]"
-              >
-                최대 전투력
-              </label>
-              <input
-                id="maxCombatPower"
-                type="number"
-                value={maxCombatPower}
-                onChange={(e) => setMaxCombatPower(e.target.value)}
-                className="w-24 rounded border border-[var(--gray-4)] px-3 py-1.5 text-[var(--gray-12)] outline-none focus:border-[var(--accent-10)] focus:transition-all focus:duration-300"
-                placeholder="9999"
-              />
-            </div>
+      <AnalysisResults
+        results={results}
+        selectedSkill={selectedSkill}
+        setSelectedSkill={setSelectedSkill}
+        groupedTripodData={groupedTripodData}
+      />
 
-            <div>
-              <label
-                htmlFor="endRank"
-                className="mb-2 block text-sm text-[var(--gray-11)]"
-              >
-                분석 대상
-              </label>
-              <select
-                id="endRank"
-                value={endRank}
-                onChange={(e) => setEndRank(e.target.value)}
-                required
-                className="w-auto rounded border border-[var(--gray-4)] px-3 py-1.5 text-[var(--gray-12)] outline-none focus:border-[var(--accent-10)] focus:transition-all focus:duration-300"
-              >
-                <option value="10">상위 10명</option>
-                <option value="30">상위 30명</option>
-                <option value="50">상위 50명</option>
-                <option value="100">상위 100명</option>
-              </select>
-            </div>
-
-            <div className="flex items-end">
-              <button
-                type="submit"
-                disabled={isAnalyzing || isWaiting}
-                className={`${
-                  isWaiting
-                    ? 'h-9 w-auto animate-pulse cursor-wait rounded border border-[var(--accent-10)] bg-[var(--accent-10)] px-6 text-white transition-all'
-                    : 'h-9 w-auto rounded border border-[var(--gray-8)] px-6 text-[var(--gray-12)] transition-all active:bg-[var(--accent-6)]'
-                } disabled:cursor-not-allowed disabled:bg-[var(--gray-5)]`}
-                aria-live="polite"
-              >
-                {buttonLabel}
-              </button>
-            </div>
-          </div>
-        </div>
-      </form>
-
-      {(isAnalyzing || preparedData.length > 0) && (
-        <>
-          <div className="block w-full flex-row pb-3 pt-3 md:flex">
-            <SectionHeader
-              title="조건 상세"
-              description="사용 코어를 선택해 조건을 세부 설정합니다."
-            />
-            <div className="w-full md:w-9/12">
-              <div className="inline-flex w-fit max-w-full flex-col gap-3 self-start md:w-auto">
-                {coreOptions.length > 0 ? (
-                  <>
-                    <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-4">
-                      <div className="flex flex-col gap-3 md:flex-row md:flex-wrap">
-                        <CoreCategorySelector
-                          title="질서의 해 코어"
-                          category="sun"
-                          cores={coreOptionsByCategory.sun}
-                          selectedCore={selectedCoresByCategory.sun}
-                          onToggle={toggleCore}
-                          disabled={!coresEnabled}
-                        />
-                        <CoreCategorySelector
-                          title="질서의 달 코어"
-                          category="moon"
-                          cores={coreOptionsByCategory.moon}
-                          selectedCore={selectedCoresByCategory.moon}
-                          onToggle={toggleCore}
-                          disabled={!coresEnabled}
-                        />
-                        <CoreCategorySelector
-                          title="질서의 별 코어"
-                          category="star"
-                          cores={coreOptionsByCategory.star}
-                          selectedCore={selectedCoresByCategory.star}
-                          onToggle={toggleCore}
-                          disabled={!coresEnabled}
-                        />
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  <span className="text-sm text-[var(--gray-9)]">
-                    직업 각인를 선택하면 코어가 표시됩니다.
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-        </>
-      )}
-
-      {isAnalyzing && (
-        <div className="my-4 rounded-lg bg-[var(--gray-2)] p-4">
-          <div className="mb-2 text-sm text-[var(--gray-11)]">
-            {progress.message}
-          </div>
-          <div className="h-2 w-full rounded-full bg-[var(--gray-5)]">
-            <div
-              className="h-2 rounded-full bg-[var(--accent-9)] transition-all duration-500"
-              style={{ width: `${(progress.current / progress.total) * 100}%` }}
-            ></div>
-          </div>
-        </div>
-      )}
-
-      {results && (
-        <>
-          <div className="block w-full flex-row border-b border-[var(--gray-5)] pb-3 md:flex">
-            <SectionHeader
-              title="분석 결과 요약"
-              description="분석된 데이터의 주요 통계입니다."
-            />
-            <div className="grid w-full grid-cols-2 gap-4 md:w-9/12 md:grid-cols-4">
-              <StatCard
-                label="분석대상 캐릭터"
-                value={results.totalCharacters}
-              />
-              <StatCard
-                label="조건 부합 캐릭터"
-                value={results.keptCharacters.length}
-              />
-              <StatCard
-                label="추출된 트라이포드"
-                value={results.allRows.length}
-              />
-              <StatCard
-                label="고유 스킬"
-                value={results.skillUsageRows.length}
-              />
-            </div>
-          </div>
-
-          <div className="block w-full flex-row border-b border-[var(--gray-5)] pb-3 md:flex">
-            <SectionHeader
-              title="스킬 사용 통계"
-              description="랭커들의 스킬 채용률입니다."
-            />
-            <div className="w-full md:w-9/12">
-              <div className="w-full rounded-lg border border-dashed border-[var(--gray-8)] p-3">
-                <div className="flex border-b border-[var(--gray-5)] pb-3 text-sm text-[var(--gray-11)]">
-                  <div className="flex-1 text-center">스킬명</div>
-                  <div className="flex-1 text-center">사용 캐릭터 수</div>
-                  <div className="flex-1 text-center">사용률</div>
-                </div>
-                {results.skillUsageRows.map((row) => (
-                  <div
-                    key={row.skill_name}
-                    onClick={() => setSelectedSkill(row.skill_name)}
-                    className={`flex h-10 cursor-pointer items-center text-sm text-[var(--gray-11)] hover:bg-[var(--gray-4)] ${
-                      selectedSkill === row.skill_name
-                        ? 'bg-[var(--accent-6)]'
-                        : ''
-                    }`}
-                  >
-                    <div className="flex-1 text-center font-medium">
-                      {row.skill_name}
-                    </div>
-                    <div className="flex-1 text-center">{row.characters}</div>
-                    <div className="flex-1 text-center">
-                      {results.keptCharacters.length > 0
-                        ? Math.round(
-                            (row.characters / results.keptCharacters.length) *
-                              100,
-                          )
-                        : 0}
-                      %
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div className="block w-full flex-row pb-3 md:flex">
-            <SectionHeader
-              title="캐릭터 스킬 상세"
-              description="캐릭터별 스킬, 레벨, 트라이포드, 룬 정보입니다."
-            />
-            <div className="w-full md:w-9/12">
-              <div className="w-full rounded-lg border border-dashed border-[var(--gray-8)] p-3">
-                <div className="flex border-b border-[var(--gray-5)] pb-3 text-xs font-semibold text-[var(--gray-11)]">
-                  <div className="w-1/5 text-center">캐릭터</div>
-                  <div className="flex w-4/5">
-                    <div className="w-3/12 text-center">스킬명</div>
-                    <div className="w-2/12 text-center">레벨</div>
-                    <div className="w-5/12 text-center">트라이포드</div>
-                    <div className="w-2/12 text-center">룬</div>
-                  </div>
-                </div>
-                {Object.entries(groupedTripodData).map(
-                  ([character, skills]: [string, any]) => {
-                    const skillEntries = Object.entries(skills);
-                    return (
-                      <div
-                        key={character}
-                        className={`flex border-b border-[var(--gray-4)] text-xs text-[var(--gray-11)] last:border-b-0`}
-                      >
-                        <div className="flex w-1/5 items-center justify-center border-r border-[var(--gray-4)] p-2 text-sm font-bold md:text-base">
-                          <a
-                            href={`https://kloa.gg/characters/${encodeURIComponent(character)}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-sky-600 underline decoration-from-font underline-offset-2 transition-colors hover:text-sky-700 hover:underline dark:text-sky-400 dark:hover:text-sky-300"
-                          >
-                            {character}
-                          </a>
-                        </div>
-                        <div className="w-4/5">
-                          {skillEntries.map(
-                            ([skillName, skillData]: [string, any], index) => (
-                              <div
-                                key={skillName}
-                                className={`flex min-h-10 items-center ${
-                                  index < skillEntries.length - 1
-                                    ? 'border-b border-[var(--gray-4)]'
-                                    : ''
-                                } ${
-                                  selectedSkill === skillName
-                                    ? 'bg-[var(--accent-6)]'
-                                    : ''
-                                }`}
-                              >
-                                <div className="w-3/12 p-2 text-center">
-                                  {skillName}
-                                </div>
-                                <div className="w-2/12 p-2 text-center">
-                                  {skillData.skill_level}
-                                </div>
-                                <div className="w-5/12 p-2 text-center text-xs">
-                                  {skillData.tripods
-                                    ?.map(
-                                      (t: any) =>
-                                        `${(t.tier ?? 0) + 1}T-${t.name || ''}`,
-                                    )
-                                    .join(' / ') || '-'}
-                                </div>
-                                <div className="w-2/12 p-2 text-center">
-                                  {skillData.rune_name || '-'}
-                                </div>
-                              </div>
-                            ),
-                          )}
-                        </div>
-                      </div>
-                    );
-                  },
-                )}
-              </div>
-            </div>
-          </div>
-        </>
-      )}
-
-      {logs.length > 1 && (
-        <div className="block w-full flex-row border-t border-[var(--gray-5)] pt-3 md:flex">
-          <SectionHeader
-            title="분석 로그"
-            description="API 요청 및 데이터 처리 과정의 로그입니다."
-          />
-          <div className="w-full md:w-9/12">
-            <div
-              ref={logBoxRef}
-              className="max-h-60 overflow-y-auto rounded-lg bg-[var(--gray-1)] p-4 font-mono text-xs text-[var(--gray-11)]"
-            >
-              {logs.map((logMsg, i) => (
-                <div key={i}>{logMsg}</div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
+      <AnalysisLogs logs={logs} logBoxRef={logBoxRef} />
     </div>
   );
 }

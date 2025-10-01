@@ -134,3 +134,23 @@ export async function setCachedArmory(name: string, data: any): Promise<void> {
     console.warn('[cache] IndexedDB write failed (skip cache)', e);
   }
 }
+
+/**
+ * IndexedDB에서 모든 캐릭터 데이터를 조회합니다.
+ * @returns 모든 캐시된 데이터 배열 또는 빈 배열을 담은 Promise
+ */
+export async function idbGetAllArmories(): Promise<any[]> {
+  try {
+    const db = await openArmoryDB();
+    return new Promise<any[]>((resolve, reject) => {
+      const tx = db.transaction(CACHE_STORE, 'readonly');
+      const store = tx.objectStore(CACHE_STORE);
+      const getAllReq = store.getAll();
+      getAllReq.onsuccess = () => resolve(getAllReq.result || []);
+      getAllReq.onerror = () => reject(getAllReq.error);
+    });
+  } catch (e) {
+    console.warn('[cache] IndexedDB getAll failed', e);
+    return [];
+  }
+}

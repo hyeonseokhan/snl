@@ -2,6 +2,7 @@ import * as React from 'react';
 
 import type { Metadata } from 'next';
 import { NextThemeProvider } from './next-theme-provider';
+import { TestModeProvider } from './hooks/test-mode-context';
 import { siteConfig } from '../config/global';
 import { Navigation } from './navigation';
 import '@radix-ui/themes/styles.css';
@@ -24,7 +25,9 @@ export default function RootLayout({
     <html lang="ko" suppressHydrationWarning>
       <body>
         <NextThemeProvider>
-          <Navigation>{children}</Navigation>
+          <TestModeProvider>
+            <Navigation>{children}</Navigation>
+          </TestModeProvider>
         </NextThemeProvider>
       </body>
     </html>

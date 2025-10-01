@@ -8,11 +8,13 @@ import { SideBarIcon } from '../icons/SideBarIcon';
 import { DiscordIcon } from '../icons/DiscordIcon';
 import { TreeDotVerticalIcon } from '../icons/TreeDotVertical';
 import { useThemeToggle } from '../../app/hooks/theme-toggle';
+import { useTestMode } from '../../app/hooks/test-mode-context';
 
 const DesktopNavBar = () => {
   const pathname = usePathname();
   const links = getFilteredLinks(['todo', 'community', 'tools']);
   const { toggleTheme, Icon, label } = useThemeToggle();
+  const { isTestMode, toggleTestMode } = useTestMode();
   return (
     <div className="hidden h-14 flex-wrap items-center justify-between pl-4 pr-5 md:flex">
       <Flex align="center" gap="1">
@@ -62,6 +64,12 @@ const DesktopNavBar = () => {
               <div className="flex items-center gap-x-2 py-1">
                 <Icon />
                 {label}
+              </div>
+            </DropdownMenu.Item>
+
+            <DropdownMenu.Item onClick={toggleTestMode}>
+              <div className="flex items-center gap-x-2 py-1">
+                <span>오프라인 테스트: {isTestMode ? 'ON' : 'OFF'}</span>
               </div>
             </DropdownMenu.Item>
           </DropdownMenu.Content>
