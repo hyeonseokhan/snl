@@ -10,7 +10,12 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { SectionHeader, CoreCategorySelector, StatCard } from './components';
+import {
+  SectionHeader,
+  CoreCategorySelector,
+  StatCard,
+  TooltipChip,
+} from './components';
 import { fetchRankNames, fetchArmories, CONCURRENCY_ARMORY } from './api';
 import { idbGetAllArmories } from './cache';
 import {
@@ -37,6 +42,103 @@ import React from 'react';
 const ANALYSIS_STEPS = 4;
 
 /**
+ * 로스트아크 Tooltip 원문(raw string)을 HTML 문자열로 변환합니다.
+ * - JSON 문자열(요소 맵)인 경우 내용을 파싱해 line-by-line HTML로 구성합니다.
+ * - 그 외에는 이미 HTML로 간주하여 그대로 반환합니다.
+ * - 오브젝트/불린 등 비문자열 값은 무시합니다.
+ * - 각 라인은 div로 감싸고, 숫자/퍼센트 강조 및 <BR> 정규화, 중복 제거 등 가독성 향상.
+ */
+const toHtmlFromLoaTooltip = (raw: any): string => {
+  if (!raw) return '';
+  const s = typeof raw === 'string' ? raw.trim() : '';
+  if (!s) return '';
+
+  // helper: string only
+  const normalize = (val: any): string =>
+    typeof val === 'string' && val.trim() ? val.trim() : '';
+
+  // helper: format one line (numbers/percentages emphasized)
+  const formatLine = (line: string): string => {
+    let out = line;
+    // normalize explicit <BR> variants from source
+    out = out.replace(/<\s*BR\s*\/?>/gi, '<br/>');
+    // emphasize large numbers (damage etc.)
+    out = out.replace(
+      /\b(\d{1,3}(?:,\d{3})+)\b/g,
+      '<span style="color: var(--accent-11); font-weight:600">$1</span>',
+    );
+    // emphasize percents
+    out = out.replace(
+      /\b(\d+(?:\.\d+)?%)/g,
+      '<span style="color: var(--green-11); font-weight:600">$1</span>',
+    );
+    // soften common labels
+    out = out.replace(
+      /(^|\s)(마나|재사용 대기시간|공격 타입|슈퍼아머|카운터)(\s*[:：])/g,
+      '$1<span style="color: var(--gray-11); font-weight:600">$2</span>$3',
+    );
+    return out;
+  };
+
+  if (s.startsWith('{') && s.endsWith('}')) {
+    try {
+      const obj = JSON.parse(s) as Record<string, any>;
+      const parts: string[] = [];
+
+      // iterate in key order for stable output
+      for (const key of Object.keys(obj).sort()) {
+        const el = (obj as any)[key];
+        if (!el) continue;
+
+        // collect known string fields only
+        const vals = [
+          normalize(el.value),
+          normalize(el.tooltip),
+          normalize(el.contentStr),
+          normalize(el.leftStr0),
+          normalize(el.rightStr0),
+          normalize(el.text),
+        ].filter(Boolean);
+
+        if (vals.length) parts.push(vals.join(' '));
+
+        // nested elements (array): also pick string-like values only
+        if (Array.isArray(el.elements)) {
+          for (const sub of el.elements) {
+            const sv =
+              normalize(sub?.value) ||
+              normalize(sub?.contentStr) ||
+              normalize(sub?.text);
+            if (sv) parts.push(sv);
+          }
+        }
+      }
+
+      // de-duplicate consecutive lines & wrap each line in its own block
+      const cleaned: string[] = [];
+      for (const line of parts) {
+        if (!line) continue;
+        if (cleaned.length === 0 || cleaned[cleaned.length - 1] !== line) {
+          cleaned.push(line);
+        }
+      }
+
+      return cleaned
+        .map(
+          (line) =>
+            `<div style="margin:3px 0; line-height:1.4">${formatLine(line)}</div>`,
+        )
+        .join('');
+    } catch {
+      // if JSON parse fails, fallthrough and treat as HTML
+    }
+  }
+
+  // treat as HTML already; caller (TooltipChip) will sanitize
+  return s.replace(/<\s*BR\s*\/?>/gi, '<br/>');
+};
+
+/**
  * 캐릭터의 전투정보실(armory) 데이터를 받아 분석에 필요한 형태로 가공합니다.
  * @param name 캐릭터 이름
  * @param armory API 또는 캐시에서 가져온 캐릭터 데이터
@@ -45,7 +147,7 @@ const ANALYSIS_STEPS = 4;
 const prepareCharacterDataFromArmory = (
   name: string,
   armory: any,
-): PreparedCharacterData => {
+): PreparedCharacterData & { tooltipBySkill?: Record<string, any> } => {
   if (!armory) {
     return { name, rows: [], usedSkills: new Set(), arkgridSet: new Set() };
   }
@@ -53,7 +155,46 @@ const prepareCharacterDataFromArmory = (
   const rows = extractSelectedRows(name, skillsClean);
   const usedSkills = aggregateSkillUsageByCharacter(skillsClean);
   const arkgridSet = extractArkgridSlotNameSet(armory);
-  return { name, rows, usedSkills, arkgridSet };
+
+  // --- Tooltip/아이콘 수집: 스킬/트포/룬 ---
+  const tooltipBySkill: Record<
+    string,
+    {
+      skillHtml?: string;
+      skillIcon?: string;
+      runeHtml?: string;
+      runeIcon?: string;
+      tripods: Record<string, { html: string; icon?: string; tier?: number }>;
+    }
+  > = {};
+
+  for (const s of skillsClean) {
+    const key = s.Name;
+    const bundle = {
+      skillHtml: toHtmlFromLoaTooltip(s.Tooltip),
+      skillIcon: s.Icon,
+      runeHtml: s.Rune ? toHtmlFromLoaTooltip(s.Rune.Tooltip) : undefined,
+      runeIcon: s.Rune?.Icon,
+      tripods: {} as Record<
+        string,
+        { html: string; icon?: string; tier?: number }
+      >,
+    };
+    if (Array.isArray(s.Tripods)) {
+      for (const t of s.Tripods) {
+        const tName = t?.Name || '';
+        if (!tName) continue;
+        bundle.tripods[tName] = {
+          html: toHtmlFromLoaTooltip(t.Tooltip),
+          icon: t.Icon,
+          tier: typeof t.Tier === 'number' ? t.Tier : undefined,
+        };
+      }
+    }
+    tooltipBySkill[key] = bundle;
+  }
+
+  return { name, rows, usedSkills, arkgridSet, tooltipBySkill };
 };
 
 /**
@@ -248,7 +389,7 @@ const SearchFilters = ({
   coresEnabled,
 }) => (
   <>
-    {(!isAnalyzing && preparedData.length > 0) && (
+    {!isAnalyzing && preparedData.length > 0 && (
       <>
         <div className="block w-full flex-row border-t border-[var(--gray-5)] pb-3 pt-3 md:flex">
           <SectionHeader
@@ -529,21 +670,47 @@ const AnalysisResults = ({
                                 }`}
                               >
                                 <div className="w-3/12 p-2 text-center">
-                                  {skillName}
+                                  <TooltipChip
+                                    label={skillName}
+                                    html={skillData.skillTooltipHtml || ''}
+                                    icon={skillData.skillIcon}
+                                    size="md"
+                                  />
                                 </div>
                                 <div className="w-2/12 p-2 text-center">
                                   {skillData.skill_level}
                                 </div>
                                 <div className="w-5/12 p-2 text-center text-xs">
-                                  {skillData.tripods
-                                    ?.map(
-                                      (t: any) =>
-                                        `${(t.tier ?? 0) + 1}T-${t.name || ''}`,
-                                    )
-                                    .join(' / ') || '-'}
+                                  {Array.isArray(skillData.tripods) &&
+                                  skillData.tripods.length > 0 ? (
+                                    <div className="flex flex-wrap items-center justify-center gap-1.5">
+                                      {skillData.tripods.map(
+                                        (t: any, idx: number) => (
+                                          <TooltipChip
+                                            key={`${skillName}-tripod-${idx}`}
+                                            label={`${(t.tier ?? 0) + 1}T-${t.name || ''}`}
+                                            html={t.tooltipHtml || ''}
+                                            icon={t.icon}
+                                            size="sm"
+                                          />
+                                        ),
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <span>-</span>
+                                  )}
                                 </div>
                                 <div className="w-2/12 p-2 text-center">
-                                  {skillData.rune_name || '-'}
+                                  {skillData.rune_name ? (
+                                    <TooltipChip
+                                      label={skillData.rune_name}
+                                      html={skillData.runeTooltipHtml || ''}
+                                      icon={skillData.runeIcon}
+                                      size="sm"
+                                    />
+                                  ) : (
+                                    <span>-</span>
+                                  )}
                                 </div>
                               </div>
                             ),
@@ -1070,10 +1237,10 @@ export default function SkillAnalyzer() {
   }, [requiredCores, preparedData, totalRanked]);
 
   // 최종 분석 결과를 캐릭터별, 스킬별로 그룹화하여 상세 테이블에 표시하기 쉽게 가공합니다.
-  // 최종 분석 결과를 캐릭터별, 스킬별로 그룹화하여 상세 테이블에 표시하기 쉽게 가공합니다.
   const groupedTripodData = useMemo(() => {
     if (!results) return {};
-    return results.allRows.reduce((acc, row) => {
+    // 1) 캐릭터/스킬 기본 집계
+    const base = results.allRows.reduce((acc, row) => {
       const charKey = row.character;
       const skillKey = row.skill_name;
       if (!acc[charKey]) acc[charKey] = {};
@@ -1081,7 +1248,7 @@ export default function SkillAnalyzer() {
         acc[charKey][skillKey] = {
           skill_level: row.skill_level,
           rune_name: row.rune_name,
-          tripods: [],
+          tripods: [] as any[],
         };
       }
       if (row.tripod_name)
@@ -1091,7 +1258,41 @@ export default function SkillAnalyzer() {
         });
       return acc;
     }, {} as any);
-  }, [results]);
+
+    // 2) 준비된 데이터에서 tooltip/icon 병합
+    const byChar: Record<string, Record<string, any>> = {};
+    for (const p of preparedData) {
+      const bundles = (p as any).tooltipBySkill || {};
+      byChar[p.name] = bundles;
+    }
+
+    for (const [charName, skills] of Object.entries(base)) {
+      const b = byChar[charName] || {};
+      for (const [skillName, skillData] of Object.entries(
+        skills as Record<string, any>,
+      )) {
+        const bundle = b[skillName];
+        if (!bundle) continue;
+        skillData.skillTooltipHtml = bundle.skillHtml || '';
+        skillData.skillIcon = bundle.skillIcon || '';
+        skillData.runeTooltipHtml = bundle.runeHtml || '';
+        skillData.runeIcon = bundle.runeIcon || '';
+        if (Array.isArray(skillData.tripods)) {
+          skillData.tripods = skillData.tripods.map((t: any) => {
+            const tb = bundle.tripods?.[t.name];
+            return {
+              ...t,
+              tooltipHtml: tb?.html || '',
+              icon: tb?.icon,
+              tier: typeof t.tier === 'number' ? t.tier : (tb?.tier ?? t.tier),
+            };
+          });
+        }
+      }
+    }
+
+    return base;
+  }, [results, preparedData]);
 
   const skillDetailStats = useMemo(() => {
     if (!selectedSkill || !results) {
