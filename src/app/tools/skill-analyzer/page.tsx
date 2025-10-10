@@ -6,7 +6,6 @@
  * - 데이터 처리: 가져온 데이터를 분석에 적합한 형태로 가공하고, 필터링 및 통계 계산을 수행합니다.
  * - 렌더링: 하위 컴포넌트(검색 폼, 필터, 결과, 로그)에 필요한 데이터와 핸들러를 전달하여 UI를 렌더링합니다.
  */
-
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -688,7 +687,7 @@ const AnalysisResults = ({
                                         (t: any, idx: number) => (
                                           <TooltipChip
                                             key={`${skillName}-tripod-${idx}`}
-                                            label={`${(t.tier ?? 0) + 1}T-${t.name || ''}`}
+                                            label={t.name || ''}
                                             html={t.tooltipHtml || ''}
                                             icon={t.icon}
                                             size="sm"
@@ -1143,7 +1142,7 @@ export default function SkillAnalyzer() {
       setIsAnalyzing(false);
     }
   }, [log, resetAnalysisState]);
-  // 사용자가 '검색 시작' 버튼을 눌렀을 때 폼 제출을 처리하는 이벤트 핸들러입니다.
+
   /**
    * 사용자가 '검색 시작' 버튼을 눌렀을 때 폼 제출을 처리하는 메인 이벤트 핸들러입니다.
    * 테스트 모드 여부에 따라 `loadDataFromCache` 또는 `acquireRankAndCharacters`를 호출합니다.

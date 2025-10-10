@@ -125,7 +125,7 @@ export const TooltipChip = ({
   size?: 'sm' | 'md';
 }) => {
   const sanitized = DOMPurify.sanitize(html || '');
-  const px = size === 'sm' ? 'px-2 py-0.5 text-[11px]' : 'px-3 py-1 text-xs';
+  const px = size === 'sm' ? 'px-2 py-1 text-[11px]' : 'px-3 py-1 text-xs';
   return (
     <div className="group relative inline-flex">
       <button
