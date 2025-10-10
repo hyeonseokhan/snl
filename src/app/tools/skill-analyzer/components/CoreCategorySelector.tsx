@@ -1,24 +1,7 @@
 'use client';
 
+import React from 'react';
 import DOMPurify from 'dompurify';
-
-/**
- * 페이지의 각 구역(Section) 제목을 표시하는 컴포넌트입니다.
- * @param {string} title - 구역의 제목
- * @param {string} description - 구역에 대한 설명
- */
-export const SectionHeader = ({
-  title,
-  description,
-}: {
-  title: string;
-  description: string;
-}) => (
-  <div className="flex w-full flex-col pb-4 md:w-3/12 md:gap-y-3 md:pb-0 md:pr-8">
-    <div className="text-[var(--gray-12)]">{title}</div>
-    <div className="text-sm text-[var(--gray-9)]">{description}</div>
-  </div>
-);
 
 /**
  * 아크 그리드의 코어(해, 달, 별)를 선택하는 UI를 렌더링하는 컴포넌트입니다. (툴팁 지원)
@@ -87,72 +70,3 @@ export const CoreCategorySelector = ({
     </div>
   </div>
 );
-
-/**
- * 분석 결과의 주요 통계 수치를 표시하는 카드 컴포넌트입니다.
- * @param {string} label - 통계 항목의 이름
- * @param {string | number} value - 통계 수치
- */
-export const StatCard = ({
-  label,
-  value,
-}: {
-  label: string;
-  value: string | number;
-}) => (
-  <div className="flex flex-col items-center justify-center rounded-lg border border-[var(--gray-5)] bg-[var(--gray-1)] p-4">
-    <div className="text-2xl font-bold text-[var(--accent-10)]">{value}</div>
-    <div className="mt-1 text-xs text-[var(--gray-11)]">{label}</div>
-  </div>
-);
-
-/**
- * 텍스트 라벨 위에 마우스를 올리면 툴팁(HTML)을 보여주는 칩 컴포넌트입니다.
- * - 현 테마 컬러 토큰(var(--gray-*), var(--accent-*)))을 그대로 사용합니다.
- * - html은 외부에서 sanitize되지 않았다면 이 컴포넌트에서 DOMPurify로 sanitize합니다.
- */
-export const TooltipChip = ({
-  label,
-  html,
-  icon,
-  disabled = false,
-  size = 'sm',
-}: {
-  label: string;
-  html: string;
-  icon?: string;
-  disabled?: boolean;
-  size?: 'sm' | 'md';
-}) => {
-  const sanitized = DOMPurify.sanitize(html || '');
-  const px = size === 'sm' ? 'px-2 py-1 text-[11px]' : 'px-3 py-1 text-xs';
-  return (
-    <div className="group relative inline-flex">
-      <button
-        type="button"
-        disabled={disabled}
-        className={`inline-flex items-center gap-1 rounded-full border ${px} transition-all ${
-          disabled
-            ? 'cursor-not-allowed opacity-50'
-            : 'border-[var(--gray-6)] bg-[var(--gray-1)] text-[var(--gray-11)] hover:bg-[var(--gray-4)]'
-        }`}
-      >
-        {icon ? <img src={icon} alt="" className="h-3.5 w-3.5" /> : null}
-        <span className="truncate">{label}</span>
-      </button>
-
-      {/* Hover Tooltip */}
-      {sanitized && (
-        <div
-          role="tooltip"
-          className="pointer-events-none invisible absolute bottom-full left-1/2 z-50 w-[28rem] max-w-[90vw] -translate-x-1/2 -translate-y-2 whitespace-pre-wrap rounded-md border border-[var(--gray-6)] bg-[var(--gray-1)] p-3 text-[var(--gray-12)] opacity-0 shadow-lg transition-opacity duration-200 group-hover:visible group-hover:opacity-100"
-        >
-          <div
-            className="text-[11px] leading-5"
-            dangerouslySetInnerHTML={{ __html: sanitized }}
-          />
-        </div>
-      )}
-    </div>
-  );
-};
