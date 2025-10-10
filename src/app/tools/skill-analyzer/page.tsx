@@ -9,22 +9,9 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  SectionHeader,
-  CoreCategorySelector,
-  StatCard,
-  TooltipChip,
-} from './components';
 import { fetchRankNames, fetchArmories, CONCURRENCY_ARMORY } from './api';
 import { idbGetAllArmories } from './cache';
-import {
-  aggregateSkillUsageByCharacter,
-  deepCleanHtml,
-  extractArkgridSlotNameSet,
-  extractSelectedRows,
-  mapPool,
-  norm,
-} from './utils';
+import { mapPool, norm, buildCoreTooltip } from './utils';
 import type {
   AnalysisResult,
   ApiCallbacks,
@@ -37,726 +24,17 @@ import { useTestMode } from '../../hooks/test-mode-context';
 import { JOB_DATA } from '../../../config/jobData';
 import type { EnlightenmentTree } from '../../../config/jobData';
 import React from 'react';
+import { prepareCharacterDataFromArmory } from './services/prepare-character';
+import { AnalysisLogs } from './sections/AnalysisLogs';
+import { SearchFilters } from './sections/SearchFilters';
+import { SearchForm } from './sections/SearchForm';
+import { AnalysisResults } from './sections/AnalysisResults';
+
+// === Constants ==============================================================
 
 const ANALYSIS_STEPS = 4;
 
-/**
- * 로스트아크 Tooltip 원문(raw string)을 HTML 문자열로 변환합니다.
- * - JSON 문자열(요소 맵)인 경우 내용을 파싱해 line-by-line HTML로 구성합니다.
- * - 그 외에는 이미 HTML로 간주하여 그대로 반환합니다.
- * - 오브젝트/불린 등 비문자열 값은 무시합니다.
- * - 각 라인은 div로 감싸고, 숫자/퍼센트 강조 및 <BR> 정규화, 중복 제거 등 가독성 향상.
- */
-const toHtmlFromLoaTooltip = (raw: any): string => {
-  if (!raw) return '';
-  const s = typeof raw === 'string' ? raw.trim() : '';
-  if (!s) return '';
-
-  // helper: string only
-  const normalize = (val: any): string =>
-    typeof val === 'string' && val.trim() ? val.trim() : '';
-
-  // helper: format one line (numbers/percentages emphasized)
-  const formatLine = (line: string): string => {
-    let out = line;
-    // normalize explicit <BR> variants from source
-    out = out.replace(/<\s*BR\s*\/?>/gi, '<br/>');
-    // emphasize large numbers (damage etc.)
-    out = out.replace(
-      /\b(\d{1,3}(?:,\d{3})+)\b/g,
-      '<span style="color: var(--accent-11); font-weight:600">$1</span>',
-    );
-    // emphasize percents
-    out = out.replace(
-      /\b(\d+(?:\.\d+)?%)/g,
-      '<span style="color: var(--green-11); font-weight:600">$1</span>',
-    );
-    // soften common labels
-    out = out.replace(
-      /(^|\s)(마나|재사용 대기시간|공격 타입|슈퍼아머|카운터)(\s*[:：])/g,
-      '$1<span style="color: var(--gray-11); font-weight:600">$2</span>$3',
-    );
-    return out;
-  };
-
-  if (s.startsWith('{') && s.endsWith('}')) {
-    try {
-      const obj = JSON.parse(s) as Record<string, any>;
-      const parts: string[] = [];
-
-      // iterate in key order for stable output
-      for (const key of Object.keys(obj).sort()) {
-        const el = (obj as any)[key];
-        if (!el) continue;
-
-        // collect known string fields only
-        const vals = [
-          normalize(el.value),
-          normalize(el.tooltip),
-          normalize(el.contentStr),
-          normalize(el.leftStr0),
-          normalize(el.rightStr0),
-          normalize(el.text),
-        ].filter(Boolean);
-
-        if (vals.length) parts.push(vals.join(' '));
-
-        // nested elements (array): also pick string-like values only
-        if (Array.isArray(el.elements)) {
-          for (const sub of el.elements) {
-            const sv =
-              normalize(sub?.value) ||
-              normalize(sub?.contentStr) ||
-              normalize(sub?.text);
-            if (sv) parts.push(sv);
-          }
-        }
-      }
-
-      // de-duplicate consecutive lines & wrap each line in its own block
-      const cleaned: string[] = [];
-      for (const line of parts) {
-        if (!line) continue;
-        if (cleaned.length === 0 || cleaned[cleaned.length - 1] !== line) {
-          cleaned.push(line);
-        }
-      }
-
-      return cleaned
-        .map(
-          (line) =>
-            `<div style="margin:3px 0; line-height:1.4">${formatLine(line)}</div>`,
-        )
-        .join('');
-    } catch {
-      // if JSON parse fails, fallthrough and treat as HTML
-    }
-  }
-
-  // treat as HTML already; caller (TooltipChip) will sanitize
-  return s.replace(/<\s*BR\s*\/?>/gi, '<br/>');
-};
-
-/**
- * 캐릭터의 전투정보실(armory) 데이터를 받아 분석에 필요한 형태로 가공합니다.
- * @param name 캐릭터 이름
- * @param armory API 또는 캐시에서 가져온 캐릭터 데이터
- * @returns 가공된 캐릭터 데이터 객체 (PreparedCharacterData)
- */
-const prepareCharacterDataFromArmory = (
-  name: string,
-  armory: any,
-): PreparedCharacterData & { tooltipBySkill?: Record<string, any> } => {
-  if (!armory) {
-    return { name, rows: [], usedSkills: new Set(), arkgridSet: new Set() };
-  }
-  const skillsClean = deepCleanHtml(armory.ArmorySkills || []);
-  const rows = extractSelectedRows(name, skillsClean);
-  const usedSkills = aggregateSkillUsageByCharacter(skillsClean);
-  const arkgridSet = extractArkgridSlotNameSet(armory);
-
-  // --- Tooltip/아이콘 수집: 스킬/트포/룬 ---
-  const tooltipBySkill: Record<
-    string,
-    {
-      skillHtml?: string;
-      skillIcon?: string;
-      runeHtml?: string;
-      runeIcon?: string;
-      tripods: Record<string, { html: string; icon?: string; tier?: number }>;
-    }
-  > = {};
-
-  for (const s of skillsClean) {
-    const key = s.Name;
-    const bundle = {
-      skillHtml: toHtmlFromLoaTooltip(s.Tooltip),
-      skillIcon: s.Icon,
-      runeHtml: s.Rune ? toHtmlFromLoaTooltip(s.Rune.Tooltip) : undefined,
-      runeIcon: s.Rune?.Icon,
-      tripods: {} as Record<
-        string,
-        { html: string; icon?: string; tier?: number }
-      >,
-    };
-    if (Array.isArray(s.Tripods)) {
-      for (const t of s.Tripods) {
-        const tName = t?.Name || '';
-        if (!tName) continue;
-        bundle.tripods[tName] = {
-          html: toHtmlFromLoaTooltip(t.Tooltip),
-          icon: t.Icon,
-          tier: typeof t.Tier === 'number' ? t.Tier : undefined,
-        };
-      }
-    }
-    tooltipBySkill[key] = bundle;
-  }
-
-  return { name, rows, usedSkills, arkgridSet, tooltipBySkill };
-};
-
-/**
- * 검색 폼 UI를 렌더링하는 컴포넌트입니다.
- * 직업, 각인, 전투력, 순위 등 검색 조건을 입력받습니다.
- */
-const SearchForm = ({
-  handleFormSubmit,
-  job,
-  setJob,
-  enlightenmentTree,
-  setEnlightenmentTree,
-  enlightenmentOptions,
-  minCombatPower,
-  setMinCombatPower,
-  maxCombatPower,
-  setMaxCombatPower,
-  endRank,
-  setEndRank,
-  isAnalyzing,
-  isWaiting,
-  buttonLabel,
-  progress,
-}) => (
-  <form
-    onSubmit={handleFormSubmit}
-    className="block w-full flex-row pb-3 md:flex"
-  >
-    <SectionHeader
-      title="검색 정보 입력"
-      description="직업, 각인, 대상 수 등을 설정합니다."
-    />
-    <div className="flex w-full flex-col gap-4 md:w-9/12">
-      {/* Row 1 */}
-      <div className="flex flex-wrap items-end gap-4">
-        <div>
-          <label
-            htmlFor="job"
-            className="mb-2 block text-sm text-[var(--gray-11)]"
-          >
-            직업 선택
-          </label>
-          <select
-            id="job"
-            value={job}
-            onChange={(e) => setJob(e.target.value)}
-            required
-            className="h-9 w-auto rounded border border-[var(--gray-4)] px-3 text-[var(--gray-12)] outline-none focus:border-[var(--accent-10)] focus:transition-all focus:duration-300"
-          >
-            <option value="">직업을 선택하세요</option>
-            {JOB_DATA.map((j) => (
-              <option key={j.code} value={j.code}>
-                {j.class}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <label
-            htmlFor="enlightenmentTree"
-            className="mb-2 block text-sm text-[var(--gray-11)]"
-          >
-            직업 각인
-          </label>
-          <select
-            id="enlightenmentTree"
-            value={enlightenmentTree}
-            onChange={(e) => setEnlightenmentTree(e.target.value)}
-            required
-            disabled={!job}
-            className="h-9 w-auto rounded border border-[var(--gray-4)] px-3 text-[var(--gray-12)] outline-none focus:border-[var(--accent-10)] focus:transition-all focus:duration-300 disabled:bg-[var(--gray-1)]"
-          >
-            <option value="">직업을 먼저 선택하세요</option>
-            {enlightenmentOptions.map((tree) => (
-              <option key={tree.name} value={tree.name}>
-                {tree.name}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      {/* Row 2 */}
-      <div className="flex flex-wrap items-end gap-4">
-        <div>
-          <label
-            htmlFor="minCombatPower"
-            className="mb-2 block text-sm text-[var(--gray-11)]"
-          >
-            최소 전투력
-          </label>
-          <input
-            id="minCombatPower"
-            type="number"
-            value={minCombatPower}
-            onChange={(e) => setMinCombatPower(e.target.value)}
-            className="h-9 w-24 rounded border border-[var(--gray-4)] px-3 text-[var(--gray-12)] outline-none focus:border-[var(--accent-10)] focus:transition-all focus:duration-300"
-            placeholder="0"
-          />
-        </div>
-
-        <div>
-          <label
-            htmlFor="maxCombatPower"
-            className="mb-2 block text-sm text-[var(--gray-11)]"
-          >
-            최대 전투력
-          </label>
-          <input
-            id="maxCombatPower"
-            type="number"
-            value={maxCombatPower}
-            onChange={(e) => setMaxCombatPower(e.target.value)}
-            className="h-9 w-24 rounded border border-[var(--gray-4)] px-3 text-[var(--gray-12)] outline-none focus:border-[var(--accent-10)] focus:transition-all focus:duration-300"
-            placeholder="9999"
-          />
-        </div>
-
-        <div>
-          <label
-            htmlFor="endRank"
-            className="mb-2 block text-sm text-[var(--gray-11)]"
-          >
-            분석 대상
-          </label>
-          <select
-            id="endRank"
-            value={endRank}
-            onChange={(e) => setEndRank(e.target.value)}
-            required
-            className="h-9 w-auto rounded border border-[var(--gray-4)] px-3 text-[var(--gray-12)] outline-none focus:border-[var(--accent-10)] focus:transition-all focus:duration-300"
-          >
-            <option value="10">상위 10명</option>
-            <option value="30">상위 30명</option>
-            <option value="50">상위 50명</option>
-            <option value="100">상위 100명</option>
-          </select>
-        </div>
-
-        <div className="flex items-end">
-          <button
-            type="submit"
-            disabled={isAnalyzing || isWaiting}
-            className={`${
-              isWaiting
-                ? 'h-9 w-auto animate-pulse cursor-wait rounded border border-[var(--accent-10)] bg-[var(--accent-10)] px-6 text-white transition-all'
-                : 'h-9 w-auto rounded border border-[var(--gray-8)] px-6 text-[var(--gray-12)] transition-all active:bg-[var(--accent-6)]'
-            } disabled:cursor-not-allowed disabled:bg-[var(--gray-5)]`}
-            aria-live="polite"
-          >
-            {buttonLabel}
-          </button>
-        </div>
-      </div>
-      <AnalysisProgress isAnalyzing={isAnalyzing} progress={progress} />
-    </div>
-  </form>
-);
-
-/**
- * 분석 진행 상태를 보여주는 프로그레스 바 컴포넌트입니다.
- */
-const AnalysisProgress = ({ isAnalyzing, progress }) => (
-  <>
-    {isAnalyzing && (
-      <div className="rounded-lg bg-[var(--gray-2)] p-4">
-        <div className="mb-2 text-sm text-[var(--gray-11)]">
-          {progress.message}
-        </div>
-        <div className="h-2 w-full rounded-full bg-[var(--gray-5)]">
-          <div
-            className="h-2 rounded-full bg-[var(--accent-9)] transition-all duration-500"
-            style={{ width: `${(progress.current / progress.total) * 100}%` }}
-          ></div>
-        </div>
-      </div>
-    )}
-  </>
-);
-
-/**
- * 상세 필터링을 위한 코어 선택 UI를 렌더링하는 컴포넌트입니다.
- */
-const SearchFilters = ({
-  isAnalyzing,
-  preparedData,
-  coreOptions,
-  coreOptionsByCategory,
-  selectedCoresByCategory,
-  toggleCore,
-  coresEnabled,
-}) => (
-  <>
-    {!isAnalyzing && preparedData.length > 0 && (
-      <>
-        <div className="block w-full flex-row border-t border-[var(--gray-5)] pb-3 pt-3 md:flex">
-          <SectionHeader
-            title="조건 상세"
-            description="사용 코어를 선택해 조건을 세부 설정합니다."
-          />
-          <div className="w-full md:w-9/12">
-            <div className="inline-flex w-fit max-w-full flex-col gap-3 self-start md:w-auto">
-              {coreOptions.length > 0 ? (
-                <>
-                  <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-4">
-                    <div className="flex flex-col gap-3 md:flex-row md:flex-wrap">
-                      <CoreCategorySelector
-                        title="질서의 해 코어"
-                        category="sun"
-                        cores={coreOptionsByCategory.sun}
-                        selectedCore={selectedCoresByCategory.sun}
-                        onToggle={toggleCore}
-                        disabled={!coresEnabled}
-                      />
-                      <CoreCategorySelector
-                        title="질서의 달 코어"
-                        category="moon"
-                        cores={coreOptionsByCategory.moon}
-                        selectedCore={selectedCoresByCategory.moon}
-                        onToggle={toggleCore}
-                        disabled={!coresEnabled}
-                      />
-                      <CoreCategorySelector
-                        title="질서의 별 코어"
-                        category="star"
-                        cores={coreOptionsByCategory.star}
-                        selectedCore={selectedCoresByCategory.star}
-                        onToggle={toggleCore}
-                        disabled={!coresEnabled}
-                      />
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <span className="text-sm text-[var(--gray-9)]">
-                  직업 각인를 선택하면 코어가 표시됩니다.
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-      </>
-    )}
-  </>
-);
-
-/**
- * 분석 결과를 요약, 스킬 통계, 캐릭터별 상세 정보로 나누어 렌더링하는 컴포넌트입니다.
- */
-const AnalysisResults = ({
-  results,
-  selectedSkill,
-  setSelectedSkill,
-  groupedTripodData,
-  skillDetailStats,
-}) => {
-  const tierColorMap = {
-    1: 'text-[var(--blue-9)]',
-    2: 'text-[var(--green-9)]',
-    3: 'text-[var(--accent-11)]',
-  };
-
-  return (
-    <>
-      {results && (
-        <>
-          <div className="block w-full flex-row border-t border-[var(--gray-5)] pt-3 md:flex">
-            <SectionHeader
-              title="분석 결과 요약"
-              description="분석된 데이터의 주요 통계입니다."
-            />
-            <div className="grid w-full grid-cols-2 gap-4 md:w-9/12 md:grid-cols-4">
-              <StatCard
-                label="분석대상 캐릭터"
-                value={results.totalCharacters}
-              />
-              <StatCard
-                label="조건 부합 캐릭터"
-                value={results.keptCharacters.length}
-              />
-              <StatCard
-                label="추출된 트라이포드"
-                value={results.allRows.length}
-              />
-              <StatCard
-                label="고유 스킬"
-                value={results.skillUsageRows.length}
-              />
-            </div>
-          </div>
-
-          <div className="block w-full flex-row border-t border-[var(--gray-5)] pt-3 md:flex">
-            <SectionHeader
-              title="스킬 사용 통계"
-              description="랭커들의 스킬 채용률입니다."
-            />
-            <div className="w-full md:w-9/12">
-              <div className="w-full rounded-lg border border-dashed border-[var(--gray-8)] p-3">
-                <div className="flex border-b border-[var(--gray-5)] pb-3 text-sm text-[var(--gray-11)]">
-                  <div className="flex-1 text-center">스킬명</div>
-                  <div className="flex-1 text-center">사용 캐릭터 수</div>
-                  <div className="flex-1 text-center">사용률</div>
-                </div>
-                {results.skillUsageRows.map((row) => (
-                  <React.Fragment key={row.skill_name}>
-                    <div
-                      onClick={() =>
-                        setSelectedSkill((prev) =>
-                          prev === row.skill_name ? null : row.skill_name,
-                        )
-                      }
-                      className={`flex h-10 cursor-pointer items-center text-sm text-[var(--gray-11)] hover:bg-[var(--gray-4)] ${
-                        selectedSkill === row.skill_name
-                          ? 'bg-[var(--accent-4)]'
-                          : ''
-                      }`}
-                    >
-                      <div className="flex-1 text-center font-medium">
-                        {row.skill_name}
-                      </div>
-                      <div className="flex-1 text-center">{row.characters}</div>
-                      <div className="flex-1 text-center">
-                        {results.keptCharacters.length > 0
-                          ? Math.round(
-                              (row.characters / results.keptCharacters.length) *
-                                100,
-                            )
-                          : 0}
-                        %
-                      </div>
-                    </div>
-                    {selectedSkill === row.skill_name && skillDetailStats && (
-                      <div className="bg-[var(--gray-1)] p-4 text-xs">
-                        <div className="mb-3 text-sm font-bold text-[var(--gray-12)]">
-                          세부 통계 (총 {skillDetailStats.total}명 중)
-                        </div>
-                        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                          <div>
-                            <h5 className="mb-1.5 font-semibold text-[var(--gray-12)]">
-                              스킬 레벨
-                            </h5>
-                            <ul className="space-y-1 text-[var(--gray-11)]">
-                              {[...skillDetailStats.skillLevels.entries()].map(
-                                ([level, count]) => (
-                                  <li key={level}>
-                                    - {level}레벨: {count}명 (
-                                    {(
-                                      (count / skillDetailStats.total) *
-                                      100
-                                    ).toFixed(1)}
-                                    %)
-                                  </li>
-                                ),
-                              )}
-                            </ul>
-                          </div>
-                          <div>
-                            <h5 className="mb-1.5 font-semibold text-[var(--gray-12)]">
-                              트라이포드
-                            </h5>
-                            <div className="space-y-2">
-                              {[...skillDetailStats.tripods.entries()].map(
-                                ([tier, tripodList]) => (
-                                  <div key={tier}>
-                                    <h6
-                                      className={`font-semibold ${
-                                        tierColorMap[tier]
-                                          ? tierColorMap[tier]
-                                          : 'text-[var(--gray-11)]'
-                                      }`}
-                                    >
-                                      {tier}티어
-                                    </h6>
-                                    <ul className="space-y-1 pl-2 text-[var(--gray-11)]">
-                                      {tripodList.map(({ name, count }) => (
-                                        <li key={name}>
-                                          - {name}: {count}명 (
-                                          {(
-                                            (count / skillDetailStats.total) *
-                                            100
-                                          ).toFixed(1)}
-                                          %)
-                                        </li>
-                                      ))}
-                                    </ul>
-                                  </div>
-                                ),
-                              )}
-                            </div>
-                          </div>
-                          <div>
-                            <h5 className="mb-1.5 font-semibold text-[var(--gray-12)]">
-                              룬
-                            </h5>
-                            <ul className="space-y-1 text-[var(--gray-11)]">
-                              {[...skillDetailStats.runes.entries()].map(
-                                ([rune, count]) => (
-                                  <li key={rune}>
-                                    - {rune}: {count}명 (
-                                    {(
-                                      (count / skillDetailStats.total) *
-                                      100
-                                    ).toFixed(1)}
-                                    %)
-                                  </li>
-                                ),
-                              )}
-                            </ul>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </React.Fragment>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div className="block w-full flex-row border-t border-[var(--gray-5)] pt-3 md:flex">
-            <SectionHeader
-              title="캐릭터 스킬 상세"
-              description="캐릭터별 스킬, 레벨, 트라이포드, 룬 정보입니다."
-            />
-            <div className="w-full md:w-9/12">
-              <div className="w-full rounded-lg border border-dashed border-[var(--gray-8)] p-3">
-                <div className="flex border-b border-[var(--gray-5)] pb-3 text-xs font-semibold text-[var(--gray-11)]">
-                  <div className="w-1/5 text-center">캐릭터</div>
-                  <div className="flex w-4/5">
-                    <div className="w-3/12 text-center">스킬명</div>
-                    <div className="w-2/12 text-center">레벨</div>
-                    <div className="w-5/12 text-center">트라이포드</div>
-                    <div className="w-2/12 text-center">룬</div>
-                  </div>
-                </div>
-                {Object.entries(groupedTripodData).map(
-                  ([character, skills]: [string, any], characterIndex) => {
-                    const skillEntries = Object.entries(skills);
-                    return (
-                      <div
-                        key={character}
-                        className={`flex text-xs text-[var(--gray-11)] ${
-                          characterIndex > 0
-                            ? 'border-t-2 border-t-[var(--gray-6)]'
-                            : ''
-                        }`}
-                      >
-                        <div className="flex w-1/5 items-center justify-center border-r border-[var(--gray-4)] p-2 text-sm font-bold">
-                          <a
-                            href={`https://kloa.gg/characters/${encodeURIComponent(
-                              character,
-                            )}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-sky-600 decoration-from-font transition-colors hover:text-sky-700 hover:underline dark:text-sky-400 dark:hover:text-sky-300"
-                          >
-                            {character}
-                          </a>
-                        </div>
-                        <div className="w-4/5">
-                          {skillEntries.map(
-                            ([skillName, skillData]: [string, any], index) => (
-                              <div
-                                key={skillName}
-                                className={`flex min-h-10 items-center ${
-                                  index < skillEntries.length - 1
-                                    ? 'border-b border-[var(--gray-4)]'
-                                    : ''
-                                } ${
-                                  selectedSkill === skillName
-                                    ? 'bg-[var(--accent-6)]'
-                                    : ''
-                                }`}
-                              >
-                                <div className="w-3/12 p-2 text-center">
-                                  <TooltipChip
-                                    label={skillName}
-                                    html={skillData.skillTooltipHtml || ''}
-                                    icon={skillData.skillIcon}
-                                    size="md"
-                                  />
-                                </div>
-                                <div className="w-2/12 p-2 text-center">
-                                  {skillData.skill_level}
-                                </div>
-                                <div className="w-5/12 p-2 text-center text-xs">
-                                  {Array.isArray(skillData.tripods) &&
-                                  skillData.tripods.length > 0 ? (
-                                    <div className="flex flex-wrap items-center justify-center gap-1.5">
-                                      {skillData.tripods.map(
-                                        (t: any, idx: number) => (
-                                          <TooltipChip
-                                            key={`${skillName}-tripod-${idx}`}
-                                            label={t.name || ''}
-                                            html={t.tooltipHtml || ''}
-                                            icon={t.icon}
-                                            size="sm"
-                                          />
-                                        ),
-                                      )}
-                                    </div>
-                                  ) : (
-                                    <span>-</span>
-                                  )}
-                                </div>
-                                <div className="w-2/12 p-2 text-center">
-                                  {skillData.rune_name ? (
-                                    <TooltipChip
-                                      label={skillData.rune_name}
-                                      html={skillData.runeTooltipHtml || ''}
-                                      icon={skillData.runeIcon}
-                                      size="sm"
-                                    />
-                                  ) : (
-                                    <span>-</span>
-                                  )}
-                                </div>
-                              </div>
-                            ),
-                          )}
-                        </div>
-                      </div>
-                    );
-                  },
-                )}
-              </div>
-            </div>
-          </div>
-        </>
-      )}
-    </>
-  );
-};
-
-/**
- * 데이터 처리 과정에서 발생하는 로그를 표시하는 컴포넌트입니다.
- */
-const AnalysisLogs = ({ logs, logBoxRef }) => (
-  <>
-    {logs.length > 1 && (
-      <div className="block w-full flex-row border-t border-[var(--gray-5)] pt-3 md:flex">
-        <SectionHeader
-          title="분석 로그"
-          description="API 요청 및 데이터 처리 과정의 로그입니다."
-        />
-        <div className="w-full md:w-9/12">
-          <div
-            ref={logBoxRef}
-            className="max-h-60 overflow-y-auto rounded-lg bg-[var(--gray-1)] p-4 font-mono text-xs text-[var(--gray-11)]"
-          >
-            {logs.map((logMsg, i) => (
-              <div key={i}>{logMsg}</div>
-            ))}
-          </div>
-        </div>
-      </div>
-    )}
-  </>
-);
-
-/**
- * 로스트아크 전투력 랭킹을 기반으로 스킬 및 트라이포드 사용 통계를 분석하는 페이지 컴포넌트입니다.
- */
+// === Page Component (default export) =========================================
 /**
  * 로스트아크 전투력 랭킹을 기반으로 스킬 및 트라이포드 사용 통계를 분석하는 페이지 컴포넌트입니다.
  * 모든 상태 관리와 핵심 로직 실행을 담당하며, 하위 UI 컴포넌트를 조립합니다.
@@ -803,6 +81,8 @@ export default function SkillAnalyzer() {
   }>({});
   const logBoxRef = useRef<HTMLDivElement | null>(null);
 
+  // --- Logging & API Callback Wiring -----------------------------------------
+
   // 분석 과정을 기록하고 화면에 표시하기 위한 로그 함수
   const log = useCallback(
     (message: string, type: 'info' | 'error' = 'info') => {
@@ -830,6 +110,7 @@ export default function SkillAnalyzer() {
     [log],
   );
 
+  // --- Effects (UI housekeeping) ---------------------------------------------
   // 로그가 추가될 때마다 로그 박스를 맨 아래로 스크롤합니다.
   useEffect(() => {
     const el = logBoxRef.current;
@@ -845,28 +126,6 @@ export default function SkillAnalyzer() {
     setSelectedCoresByCategory({});
     setRequiredCores([]);
   }, []);
-
-  /**
-   * 옵션 객체(예: { '10': '...', '14': '...', ... })를 툴팁 문자열로 변환합니다.
-   * - 존재하는 모든 키를 숫자 오름차순으로 정렬하여 "[키P] 설명" 형식으로 한 줄씩 나열합니다.
-   * - 예) 10, 14, 17, 18 ... 순으로 정렬되며, 특정 키(14/17 등)를 우선하지 않습니다.
-   * @param optionObj 각 코어의 포인트별 설명 맵 (키는 숫자 문자열, 값은 설명)
-   * @returns 개행(\n)으로 연결된 툴팁 문자열. 값이 없거나 optionObj가 없으면 빈 문자열
-   */
-  const buildCoreTooltip = (optionObj: Record<string, string> | undefined) => {
-    if (!optionObj) return '';
-    const orderedKeys = Object.keys(optionObj).sort(
-      (a, b) => Number(a) - Number(b),
-    );
-    const lines = orderedKeys
-      .map((k) =>
-        optionObj[k]
-          ? `<span style="color: var(--accent-11)">[${k}P]</span> ${optionObj[k]}`
-          : undefined,
-      )
-      .filter((v): v is string => Boolean(v));
-    return lines.join('\n');
-  };
 
   // 직업(job) 선택이 변경되면 해당 직업의 각인 목록을 설정합니다.
   useEffect(() => {
@@ -918,10 +177,7 @@ export default function SkillAnalyzer() {
 
   /**
    * 코어 선택 버튼을 토글(선택/해제)하는 함수입니다.
-   * @param {string} core - 선택된 코어의 이름
-   */
-  /**
-   * 코어 선택 버튼을 토글(선택/해제)하는 함수입니다.
+   * @param core 선택할 코어 이름
    */
   const toggleCore = (core: string) => {
     const inSun = coreOptionsByCategory.sun.some((c) => c.name === core);
@@ -1030,7 +286,7 @@ export default function SkillAnalyzer() {
       maxCP: number,
     ) => {
       log(
-        `설정: 직업=${jobCode}, 각성트리=${treeName}, 랭크=${startRank}-${endRankNum}, 전투력=${minCP}-${maxCP}`,
+        `설정: 직업=${jobCode}, 직업 각인=${treeName}, 랭크=${startRank}-${endRankNum}, 전투력=${minCP}-${maxCP}`,
       );
       setProgress({
         current: 0,
@@ -1157,7 +413,7 @@ export default function SkillAnalyzer() {
       }
 
       if (!job || !enlightenmentTree) {
-        alert('직업과 직업 각인를 모두 선택해주세요.');
+        alert('직업과 직업 각인을 모두 선택해주세요.');
         return;
       }
 
@@ -1196,13 +452,10 @@ export default function SkillAnalyzer() {
     ],
   );
 
+  // --- Derived Results & Selectors -------------------------------------------
   // `preparedData` 또는 `requiredCores`가 변경될 때마다 실시간으로 통계 결과를 필터링하고 계산합니다。
   useEffect(() => {
-    if (!preparedData || preparedData.length === 0) {
-      setResults(null);
-      return;
-    }
-    if (requiredCores.length === 0) {
+    if (!preparedData?.length || !requiredCores.length) {
       setResults(null);
       return;
     }
@@ -1235,6 +488,7 @@ export default function SkillAnalyzer() {
     });
   }, [requiredCores, preparedData, totalRanked]);
 
+  // --- Grouped Tripod Data (table model) -------------------------------------
   // 최종 분석 결과를 캐릭터별, 스킬별로 그룹화하여 상세 테이블에 표시하기 쉽게 가공합니다.
   const groupedTripodData = useMemo(() => {
     if (!results) return {};
@@ -1293,6 +547,7 @@ export default function SkillAnalyzer() {
     return base;
   }, [results, preparedData]);
 
+  // --- Selected Skill Detail Stats -------------------------------------------
   const skillDetailStats = useMemo(() => {
     if (!selectedSkill || !results) {
       return null;
@@ -1360,25 +615,34 @@ export default function SkillAnalyzer() {
     };
   }, [selectedSkill, results, groupedTripodData]);
 
-  const coresEnabled = preparedData.length > 0;
-  const isWaiting = quotaBanner.active;
-  const waitingPct = isWaiting
-    ? Math.min(
-        100,
-        Math.round((quotaBanner.shown / Math.max(1, quotaBanner.total)) * 100),
-      )
-    : 0;
-  const buttonLabel = isWaiting
-    ? `토큰 대기 중(${waitingPct}%)`
-    : isAnalyzing
-      ? '검색 중...'
-      : '검색 시작';
+  const coresEnabled = useMemo(
+    () => preparedData.length > 0,
+    [preparedData.length],
+  );
+  const isWaiting = useMemo(() => quotaBanner.active, [quotaBanner.active]);
+  const waitingPct = useMemo(() => {
+    if (!isWaiting) return 0;
+    return Math.min(
+      100,
+      Math.round((quotaBanner.shown / Math.max(1, quotaBanner.total)) * 100),
+    );
+  }, [isWaiting, quotaBanner.shown, quotaBanner.total]);
+  const buttonLabel = useMemo(() => {
+    if (isWaiting) return `토큰 대기 중(${waitingPct}%)`;
+    if (isAnalyzing) return '검색 중...';
+    return '검색 시작';
+  }, [isWaiting, waitingPct, isAnalyzing]);
 
+  // --- Render ----------------------------------------------------------------
   return (
     <div className="flex w-full flex-col gap-y-4 rounded-lg bg-[var(--gray-3)] p-5">
       <SearchForm
         handleFormSubmit={handleFormSubmit}
         job={job}
+        jobOptions={JOB_DATA.map((j) => ({
+          code: String(j.code),
+          name: j.class,
+        }))}
         setJob={setJob}
         enlightenmentTree={enlightenmentTree}
         setEnlightenmentTree={setEnlightenmentTree}
