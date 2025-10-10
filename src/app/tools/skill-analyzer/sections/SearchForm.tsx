@@ -1,20 +1,20 @@
 /**
  * @file SearchForm – 검색 폼(직업/각인/전투력/대상수) + 진행바
- * - 컨벤션: 파일 상단 @file, 섹션 구분 주석, 컴포넌트/함수 JSDoc
- * - 기능 변경 없음: 렌더 최적화(useMemo) 및 핸들러 정리(useCallback)만 적용
+ * - 이 파일의 모든 주석은 한글로 작성합니다.
+ * - 기능 변경 없이 가독성과 성능(불필요한 렌더 최소화)에 초점을 맞춘 프레젠테이션 컴포넌트입니다.
  */
 'use client';
 
 import React, { useCallback, useMemo } from 'react';
 import { SectionHeader } from '../components';
 
-// === Types ====================================================================
+// === 타입 정의 =================================================================
 
 type Progress = { current: number; total: number; message: string };
 
 /**
  * SearchForm Props
- * - UI 전용 프레젠테이션 컴포넌트이므로 모든 데이터는 상위에서 주입받습니다.
+ * - 상위 컴포넌트에서 모든 상태/데이터를 주입받아 렌더만 담당합니다.
  */
 export interface SearchFormProps {
   handleFormSubmit: (e: React.FormEvent) => Promise<void> | void;
@@ -36,13 +36,13 @@ export interface SearchFormProps {
   progress: Progress;
 }
 
-// === Component =================================================================
+// === 컴포넌트 ==================================================================
 
 /**
  * 검색 정보 입력 폼
- * - 직업 선택, 직업 각인, 전투력 범위, 분석 대상 수, 진행 바 표시
- * - 렌더 최적화: options map을 useMemo로 캐싱
- * - 이벤트 핸들러: useCallback으로 생성(안정적인 참조 유지)
+ * - 직업 선택, 직업 각인, 전투력 범위, 분석 대상 수, 진행 바를 제공합니다.
+ * - 옵션 목록 노드는 useMemo로 캐싱하여 불필요한 재생성을 줄입니다.
+ * - 이벤트 핸들러는 useCallback으로 감싸 참조의 안정성을 보장합니다.
  */
 export const SearchForm: React.FC<SearchFormProps> = ({
   handleFormSubmit,
@@ -63,7 +63,7 @@ export const SearchForm: React.FC<SearchFormProps> = ({
   buttonLabel,
   progress,
 }) => {
-  // --- Memoized option nodes ---------------------------------------------------
+  // --- 옵션 노드 메모이제이션 --------------------------------------------------
   const jobOptionNodes = useMemo(
     () =>
       jobOptions.map((opt) => (
@@ -84,7 +84,7 @@ export const SearchForm: React.FC<SearchFormProps> = ({
     [enlightenmentOptions],
   );
 
-  // --- Stable handlers ---------------------------------------------------------
+  // --- 이벤트 핸들러(안정 참조) -------------------------------------------------
   const onSubmit = useCallback(
     (e: React.FormEvent) => {
       e.preventDefault();
@@ -121,7 +121,7 @@ export const SearchForm: React.FC<SearchFormProps> = ({
     [setEndRank],
   );
 
-  // --- Render ------------------------------------------------------------------
+  // --- 렌더 --------------------------------------------------------------------
   return (
     <form onSubmit={onSubmit} className="block w-full flex-row pb-3 md:flex">
       <SectionHeader
@@ -130,7 +130,7 @@ export const SearchForm: React.FC<SearchFormProps> = ({
       />
 
       <div className="flex w-full flex-col gap-4 md:w-9/12">
-        {/* Row 1 */}
+        {/* 1행: 직업/직업 각인 */}
         <div className="flex flex-wrap items-end gap-4">
           <div>
             <label
@@ -174,7 +174,7 @@ export const SearchForm: React.FC<SearchFormProps> = ({
           </div>
         </div>
 
-        {/* Row 2 */}
+        {/* 2행: 전투력/분석 대상/버튼 */}
         <div className="flex flex-wrap items-end gap-4">
           <div>
             <label
