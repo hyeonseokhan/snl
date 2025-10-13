@@ -185,12 +185,6 @@ export const AnalysisResults: React.FC<AnalysisResultsProps> = ({
       ([character, skills]: [string, any], characterIndex) => {
         const skillEntries = Object.entries(skills);
 
-        // TODEL code
-        console.log(
-          'skillEntries JSON:',
-          JSON.stringify(skillEntries, null, 2),
-        );
-
         return (
           <div
             key={character}
@@ -226,15 +220,21 @@ export const AnalysisResults: React.FC<AnalysisResultsProps> = ({
                     <div className="w-3/12 p-2 text-center">
                       <TooltipChip
                         label={skillName}
-                        html={skillData.skillTooltipHtml || ''}
-                        icon={skillData.skillIcon}
+                        html={[
+                          skillData.tooltip.header_1,
+                          skillData.tooltip.header_2,
+                          skillData.tooltip.body,
+                        ]
+                          .filter(Boolean)
+                          .join('<br />')}
+                        icon={skillData.icon}
                         size="md"
                       />
                     </div>
 
                     {/* 스킬 레벨 */}
                     <div className="w-2/12 p-2 text-center">
-                      {skillData.skill_level}
+                      {skillData.level}
                     </div>
 
                     {/* 트라이포드 (툴팁 칩) */}
@@ -246,7 +246,7 @@ export const AnalysisResults: React.FC<AnalysisResultsProps> = ({
                             <TooltipChip
                               key={`${skillName}-tripod-${idx}`}
                               label={t.name || ''}
-                              html={t.tooltipHtml || ''}
+                              html={t.tooltip?.body || ''}
                               icon={t.icon}
                               size="sm"
                             />
@@ -259,15 +259,12 @@ export const AnalysisResults: React.FC<AnalysisResultsProps> = ({
 
                     {/* 룬 (커스텀 툴팁 샘플) */}
                     <div className="w-2/12 p-2 text-center">
-                      {skillData.rune_name ? (
+                      {skillData.rune ? (
                         <RuneTooltip
-                          name={skillData.rune_name}
-                          grade={skillData.runeGrade || skillData.rune_grade}
-                          rawDesc={
-                            skillData.runeRaw?.Element_003?.value?.Element_001
-                          }
-                          htmlFallback={skillData.runeTooltipHtml}
-                          icon={skillData.runeIcon}
+                          name={skillData.rune.name}
+                          grade={skillData.rune.grade}
+                          htmlFallback={skillData.rune.tooltip?.body || ''}
+                          icon={skillData.rune.icon}
                           size="sm"
                         />
                       ) : (
