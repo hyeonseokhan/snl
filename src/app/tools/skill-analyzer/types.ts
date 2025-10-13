@@ -42,3 +42,30 @@ export interface ApiCallbacks {
   updateQuotaStatus: (shownSec: number, totalSec: number) => void;
   endQuotaStatus: () => void;
 }
+
+// 1단계 리팩토링으로 추가된 타입
+export interface SkillDetail {
+  icon: string;
+  level: number;
+  tooltip: {
+    header_1: string;
+    header_2: string;
+    body: string;
+  };
+  tripods: {
+    icon: string;
+    tier: number;
+    name: string;
+    tooltip: {
+      body: string;
+    };
+  }[];
+  rune: {
+    icon: string;
+    name: string;
+    grade: string;
+    tooltip: {
+      body: string;
+    };
+  } | null;
+}

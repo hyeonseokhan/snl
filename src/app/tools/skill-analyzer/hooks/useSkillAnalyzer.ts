@@ -14,8 +14,8 @@ import type {
   ApiCallbacks,
   PreparedCharacterData,
   ProgressState,
-  TripodTableRow,
   CoreMeta,
+  SkillDetail,
 } from '../types';
 import { useTestMode } from '../../../hooks/test-mode-context';
 import { JOB_DATA } from '../../../../config/jobData';
@@ -48,7 +48,9 @@ export function useSkillAnalyzer() {
   });
   const [logs, setLogs] = useState<string[]>([]);
   const [results, setResults] = useState<AnalysisResult | null>(null);
-  const [preparedData, setPreparedData] = useState<PreparedCharacterData[]>([]);
+  const [preparedData, setPreparedData] = useState<
+    (PreparedCharacterData & { skillDetails: Record<string, SkillDetail> })[]
+  >([]);
   const [totalRanked, setTotalRanked] = useState<number>(0);
   const [selectedSkill, setSelectedSkill] = useState<string | null>(null);
 
@@ -247,42 +249,50 @@ export function useSkillAnalyzer() {
     async (names: string[], startRank: number) => {
       let completed = 0;
 
-      const characterData = await mapPool<
-        string,
-        (PreparedCharacterData & { rank: number }) | undefined
-      >(names, CONCURRENCY_ARMORY, async (name, i) => {
-        const rank = startRank + i;
-        try {
-          const armory = await fetchArmories(name, apiCallbacks);
-          const prepared = prepareCharacterDataFromArmory(name, armory);
-          if (prepared.rows.length === 0) {
-            log(`[실패] ${name}님의 정보를 가져오지 못했습니다.`);
-            return undefined;
-          }
-          return { ...prepared, rank };
-        } catch (error: any) {
-          log(
-            `[오류] ${rank.toString().padStart(2, '0')}. ${name} - 실패: ${error.message}`,
-            'error',
-          );
-          return undefined;
-        } finally {
-          completed += 1;
-          setProgress({
-            current: completed,
-            total: names.length,
-            message: `캐릭터 데이터 수집 중... (${completed}/${names.length})`,
-          });
-        }
-      });
+      type Prepared = PreparedCharacterData & {
+        rank: number;
+        skillDetails: Record<string, SkillDetail>;
+      };
 
-      const validData = characterData.filter(
-        (d): d is PreparedCharacterData & { rank: number } => !!d,
+      const characterData = await mapPool<string, Prepared | undefined>(
+        names,
+        CONCURRENCY_ARMORY,
+        async (name, i) => {
+          const rank = startRank + i;
+          try {
+            const armory = await fetchArmories(name, apiCallbacks);
+            const prepared = prepareCharacterDataFromArmory(name, armory);
+            if (prepared.rows.length === 0) {
+              log(`[실패] ${name}님의 정보를 가져오지 못했습니다.`);
+              return undefined;
+            }
+            return { ...prepared, rank };
+          } catch (error: any) {
+            log(
+              `[오류] ${rank.toString().padStart(2, '0')}. ${name} - 실패: ${
+                error.message
+              }`,
+              'error',
+            );
+            return undefined;
+          } finally {
+            completed += 1;
+            setProgress({
+              current: completed,
+              total: names.length,
+              message: `캐릭터 데이터 수집 중... (${completed}/${names.length})`,
+            });
+          }
+        },
       );
+
+      const validData = characterData.filter((d): d is Prepared => !!d);
 
       for (const item of validData) {
         log(
-          `[완료] ${String(item.rank).padStart(2, '0')}. ${item.name} - ${item.rows.length}개의 트라이포드 추출`,
+          `[완료] ${String(item.rank).padStart(2, '0')}. ${item.name} - ${
+            item.rows.length
+          }개의 트라이포드 추출`,
         );
       }
 
@@ -371,7 +381,9 @@ export function useSkillAnalyzer() {
         message: '캐릭터 데이터 처리 중...',
       });
 
-      const prepared: PreparedCharacterData[] = [];
+      const prepared: (PreparedCharacterData & {
+        skillDetails: Record<string, SkillDetail>;
+      })[] = [];
       let completed = 0;
 
       for (const armoryData of cachedArmories) {
@@ -381,14 +393,18 @@ export function useSkillAnalyzer() {
           if (preparedData.rows.length > 0) {
             prepared.push(preparedData);
             log(
-              `[캐시] ${String(completed + 1).padStart(2, '0')}. ${name} - ${preparedData.rows.length}개의 트라이포드 추출`,
+              `[캐시] ${String(completed + 1).padStart(2, '0')}. ${name} - ${
+                preparedData.rows.length
+              }개의 트라이포드 추출`,
             );
           } else {
             log(`[실패] ${name}님의 정보가 캐시에 비어있습니다.`);
           }
         } catch (error: any) {
           log(
-            `[오류] ${String(completed + 1).padStart(2, '0')}. ${name} - 실패: ${error.message}`,
+            `[오류] ${String(completed + 1).padStart(2, '0')}. ${name} - 실패: ${
+              error.message
+            }`,
             'error',
           );
         } finally {
@@ -472,24 +488,27 @@ export function useSkillAnalyzer() {
    * 필수 코어(requiredCores)에 부합하는 캐릭터만 필터링 후, 스킬 사용/상세 행 집계
    */
   useEffect(() => {
-    if (!preparedData?.length || !requiredCores.length) {
+    if (!preparedData?.length) {
       setResults(null);
       return;
     }
 
     const normalizedCores = new Set(requiredCores.map(norm));
+    const hasCoreFilter = normalizedCores.size > 0;
     const kept: string[] = [];
-    const allRows: TripodTableRow[] = [];
+    const allRows: any[] = []; // This is no longer used for skill details
     const skillUsageCounter = new Map<string, number>();
 
     for (const entry of preparedData) {
-      const hasAll = Array.from(normalizedCores).every((core) =>
-        Array.from(entry.arkgridSet).some((s: string) => s.includes(core)),
-      );
-      if (!hasAll) continue;
+      const hasAllCores = hasCoreFilter
+        ? Array.from(normalizedCores).every((core) =>
+            Array.from(entry.arkgridSet).some((s: string) => s.includes(core)),
+          )
+        : true; // If no cores are selected, include all characters
+
+      if (!hasAllCores) continue;
 
       kept.push(entry.name);
-      allRows.push(...entry.rows);
       entry.usedSkills.forEach((skill: string) => {
         skillUsageCounter.set(skill, (skillUsageCounter.get(skill) || 0) + 1);
       });
@@ -511,63 +530,24 @@ export function useSkillAnalyzer() {
    * 캐릭터별 스킬 상세(툴팁 번들 포함) 구조로 변환
    */
   const groupedTripodData = useMemo(() => {
-    if (!results) return {} as Record<string, any>;
+    if (!results?.keptCharacters.length || !preparedData.length) {
+      return {};
+    }
 
-    const base = results.allRows.reduce((acc, row) => {
-      const charKey = row.character;
-      const skillKey = row.skill_name;
-      if (!acc[charKey]) acc[charKey] = {};
-      if (!acc[charKey][skillKey]) {
-        acc[charKey][skillKey] = {
-          skill_level: row.skill_level,
-          rune_name: row.rune_name,
-          tripods: [] as any[],
-        };
-      }
-      if (row.tripod_name)
-        acc[charKey][skillKey].tripods.push({
-          tier: row.tripod_tier,
-          name: row.tripod_name,
-        });
-      return acc;
-    }, {} as any);
-
-    // 캐릭터별 스킬 툴팁 번들 병합
-    const byChar: Record<string, Record<string, any>> = {};
+    const characterDetailsMap = new Map<string, Record<string, SkillDetail>>();
     for (const p of preparedData) {
-      const bundles = (p as any).tooltipBySkill || {};
-      byChar[p.name] = bundles;
+      characterDetailsMap.set(p.name, p.skillDetails);
     }
 
-    for (const [charName, skills] of Object.entries(base)) {
-      const b = byChar[charName] || {};
-      for (const [skillName, skillData] of Object.entries(
-        skills as Record<string, any>,
-      )) {
-        const bundle = (b as any)[skillName];
-        if (!bundle) continue;
-        (skillData as any).skillTooltipHtml = bundle.skillHtml || '';
-        (skillData as any).skillIcon = bundle.skillIcon || '';
-        (skillData as any).runeTooltipHtml = bundle.runeHtml || '';
-        (skillData as any).runeIcon = bundle.runeIcon || '';
-        if (Array.isArray((skillData as any).tripods)) {
-          (skillData as any).tripods = (skillData as any).tripods.map(
-            (t: any) => {
-              const tb = bundle.tripods?.[t.name];
-              return {
-                ...t,
-                tooltipHtml: tb?.html || '',
-                icon: tb?.icon,
-                tier:
-                  typeof t.tier === 'number' ? t.tier : (tb?.tier ?? t.tier),
-              };
-            },
-          );
-        }
+    const finalGroupedData: Record<string, Record<string, SkillDetail>> = {};
+    for (const charName of results.keptCharacters) {
+      const details = characterDetailsMap.get(charName);
+      if (details) {
+        finalGroupedData[charName] = details;
       }
     }
 
-    return base;
+    return finalGroupedData;
   }, [results, preparedData]);
 
   /**
@@ -588,15 +568,12 @@ export function useSkillAnalyzer() {
       const skillData = (skills as any)[selectedSkill];
       if (!skillData) continue;
 
-      skillLevels.set(
-        skillData.skill_level,
-        (skillLevels.get(skillData.skill_level) || 0) + 1,
-      );
+      skillLevels.set(skillData.level, (skillLevels.get(skillData.level) || 0) + 1);
 
-      if (skillData.rune_name) {
+      if (skillData.rune?.name) {
         runes.set(
-          skillData.rune_name,
-          (runes.get(skillData.rune_name) || 0) + 1,
+          skillData.rune.name,
+          (runes.get(skillData.rune.name) || 0) + 1,
         );
       }
 

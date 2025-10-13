@@ -1,27 +1,16 @@
-/**
- * @file Skill Analyzer 페이지의 메인 로직을 담당하는 파일입니다.
- * 이 파일은 다음과 같은 주요 기능들을 포함합니다:
- * - 상태 관리: 직업, 각인, 전투력 등 사용자 입력과 분석 결과, 로그 등 모든 상태를 관리합니다.
- * - 데이터 페칭: 로스트아크 API 또는 IndexedDB 캐시에서 캐릭터 데이터를 가져옵니다.
- * - 데이터 처리: 가져온 데이터를 분석에 적합한 형태로 가공하고, 필터링 및 통계 계산을 수행합니다.
- * - 렌더링: 하위 컴포넌트(검색 폼, 필터, 결과, 로그)에 필요한 데이터와 핸들러를 전달하여 UI를 렌더링합니다.
- */
 'use client';
 
 import React from 'react';
 import { JOB_DATA } from '../../../config/jobData';
-import { AnalysisLogs } from './sections/AnalysisLogs';
-import { SearchFilters } from './sections/SearchFilters';
 import { SearchForm } from './sections/SearchForm';
-import { AnalysisResults } from './sections/AnalysisResults';
 import { useSkillAnalyzer } from './hooks/useSkillAnalyzer';
+import { AnalysisLogs } from './sections/AnalysisLogs';
 
-// === Page Component (default export) =========================================
 /**
- * 로스트아크 전투력 랭킹을 기반으로 스킬 및 트라이포드 사용 통계를 분석하는 페이지 컴포넌트입니다.
- * 모든 상태 관리와 핵심 로직 실행을 담당하며, 하위 UI 컴포넌트를 조립합니다.
+ * 1단계 리팩토링 결과 확인용 임시 페이지입니다.
+ * - groupedTripodData의 최종 구조를 JSON 형태로 출력합니다.
  */
-export default function SkillAnalyzer() {
+export default function SkillAnalyzerTempPage() {
   const {
     job,
     setJob,
@@ -37,21 +26,11 @@ export default function SkillAnalyzer() {
     isWaiting,
     progress,
     logs,
-    results,
-    preparedData,
-    selectedSkill,
-    setSelectedSkill,
-    enlightenmentOptions,
-    coreOptions,
-    coreOptionsByCategory,
-    selectedCoresByCategory,
     logBoxRef,
-    toggleCore,
     handleFormSubmit,
     groupedTripodData,
-    skillDetailStats,
-    coresEnabled,
     buttonLabel,
+    enlightenmentOptions,
   } = useSkillAnalyzer();
 
   // --- Render ----------------------------------------------------------------
@@ -80,23 +59,15 @@ export default function SkillAnalyzer() {
         progress={progress}
       />
 
-      <SearchFilters
-        isAnalyzing={isAnalyzing}
-        preparedData={preparedData}
-        coreOptions={coreOptions}
-        coreOptionsByCategory={coreOptionsByCategory}
-        selectedCoresByCategory={selectedCoresByCategory}
-        toggleCore={toggleCore}
-        coresEnabled={coresEnabled}
-      />
-
-      <AnalysisResults
-        results={results}
-        selectedSkill={selectedSkill}
-        setSelectedSkill={setSelectedSkill}
-        groupedTripodData={groupedTripodData}
-        skillDetailStats={skillDetailStats}
-      />
+      {/* 수정된 객체 출력 부 */}
+      <div className="mt-4 w-full rounded-lg border border-dashed border-[var(--gray-8)] bg-[var(--gray-1)] p-4">
+        <h2 className="mb-2 text-lg font-bold text-[var(--gray-12)]">
+          `groupedTripodData` (JSON 결과)
+        </h2>
+        <pre className="overflow-x-auto whitespace-pre-wrap break-all bg-[var(--gray-2)] p-3 text-xs text-[var(--gray-11)]">
+          <code>{JSON.stringify(groupedTripodData, null, 2)}</code>
+        </pre>
+      </div>
 
       <AnalysisLogs logs={logs} logBoxRef={logBoxRef} />
     </div>
