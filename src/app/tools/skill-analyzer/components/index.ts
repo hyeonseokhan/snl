@@ -1,5 +1,6 @@
 export * from './SectionHeader';
 export * from './CoreCategorySelector';
 export * from './StatCard';
-export * from './TooltipChip';
 export * from './RuneTooltip';
+export * from './TripodTooltip';
+export * from './SkillTooltip';

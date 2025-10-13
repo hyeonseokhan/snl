@@ -9,8 +9,9 @@ import React, { Fragment, useMemo } from 'react';
 import {
   SectionHeader,
   StatCard,
-  TooltipChip,
   RuneTooltip,
+  TripodTooltip,
+  SkillTooltip,
 } from '../components';
 
 // === 타입 정의 =================================================================
@@ -218,15 +219,9 @@ export const AnalysisResults: React.FC<AnalysisResultsProps> = ({
                   >
                     {/* 스킬명 (툴팁 칩) */}
                     <div className="w-3/12 p-2 text-center">
-                      <TooltipChip
-                        label={skillName}
-                        html={[
-                          skillData.tooltip.header_1,
-                          skillData.tooltip.header_2,
-                          skillData.tooltip.body,
-                        ]
-                          .filter(Boolean)
-                          .join('<br />')}
+                      <SkillTooltip
+                        name={skillName}
+                        tooltip={skillData.tooltip}
                         icon={skillData.icon}
                         size="md"
                       />
@@ -243,10 +238,10 @@ export const AnalysisResults: React.FC<AnalysisResultsProps> = ({
                       skillData.tripods.length > 0 ? (
                         <div className="flex flex-wrap items-center justify-center gap-1.5">
                           {skillData.tripods.map((t: any, idx: number) => (
-                            <TooltipChip
+                            <TripodTooltip
                               key={`${skillName}-tripod-${idx}`}
-                              label={t.name || ''}
-                              html={t.tooltip?.body || ''}
+                              name={t.name || ''}
+                              body={t.tooltip?.body || ''}
                               icon={t.icon}
                               size="sm"
                             />

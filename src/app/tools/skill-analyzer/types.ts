@@ -50,7 +50,8 @@ export interface SkillDetail {
   tooltip: {
     header_1: string;
     header_2: string;
-    body: string;
+    body_1: string;
+    body_2: string[];
   };
   tripods: {
     icon: string;

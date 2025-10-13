@@ -90,7 +90,7 @@ export const RuneTooltip: React.FC<RuneTooltipProps> = ({
         </div>
 
         {/* 구분선(은은하게) */}
-        <div className="border-[var(--gray-6)]/70 my-2 border-t" />
+        <div className="my-2 border-t border-[var(--gray-6)]" />
 
         {/* 본문: 좌측 정렬 / JSON → HTML 폴백 순서 */}
         {rawDesc ? (
