@@ -6,7 +6,12 @@
 'use client';
 
 import React, { Fragment, useMemo } from 'react';
-import { SectionHeader, StatCard, TooltipChip } from '../components';
+import {
+  SectionHeader,
+  StatCard,
+  TooltipChip,
+  RuneTooltip,
+} from '../components';
 
 // === 타입 정의 =================================================================
 
@@ -179,6 +184,13 @@ export const AnalysisResults: React.FC<AnalysisResultsProps> = ({
     return Object.entries(groupedTripodData).map(
       ([character, skills]: [string, any], characterIndex) => {
         const skillEntries = Object.entries(skills);
+
+        // TODEL code
+        console.log(
+          'skillEntries JSON:',
+          JSON.stringify(skillEntries, null, 2),
+        );
+
         return (
           <div
             key={character}
@@ -245,12 +257,16 @@ export const AnalysisResults: React.FC<AnalysisResultsProps> = ({
                       )}
                     </div>
 
-                    {/* 룬 (툴팁 칩) */}
+                    {/* 룬 (커스텀 툴팁 샘플) */}
                     <div className="w-2/12 p-2 text-center">
                       {skillData.rune_name ? (
-                        <TooltipChip
-                          label={skillData.rune_name}
-                          html={skillData.runeTooltipHtml || ''}
+                        <RuneTooltip
+                          name={skillData.rune_name}
+                          grade={skillData.runeGrade || skillData.rune_grade}
+                          rawDesc={
+                            skillData.runeRaw?.Element_003?.value?.Element_001
+                          }
+                          htmlFallback={skillData.runeTooltipHtml}
                           icon={skillData.runeIcon}
                           size="sm"
                         />
