@@ -56,7 +56,7 @@ export const AnalysisResults: React.FC<AnalysisResultsProps> = ({
   // --- 결과 요약 카드 -----------------------------------------------------------
   const summaryCards = useMemo(
     () => (
-      <div className="grid w-full grid-cols-2 gap-4 md:w-9/12 md:grid-cols-4">
+      <div className="grid w-full grid-cols-3 gap-1">
         <StatCard label="분석대상 캐릭터" value={totalCharacters} />
         <StatCard label="조건 부합 캐릭터" value={keptCharactersLen} />
         <StatCard label="고유 스킬" value={skillUsageLen} />

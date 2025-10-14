@@ -14,7 +14,7 @@ export const StatCard = ({
   label: string;
   value: string | number;
 }) => (
-  <div className="flex flex-col items-center justify-center rounded-lg border border-[var(--gray-5)] bg-[var(--gray-1)] p-4">
+  <div className="flex flex-col items-center justify-center rounded-md border border-dashed border-[var(--gray-7)] p-2">
     <div className="text-2xl font-bold text-[var(--accent-10)]">{value}</div>
     <div className="mt-1 text-xs text-[var(--gray-11)]">{label}</div>
   </div>
