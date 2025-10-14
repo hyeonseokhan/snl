@@ -145,7 +145,7 @@ export const SearchForm: React.FC<SearchFormProps> = ({
               value={job}
               onChange={onChangeJob}
               required
-              className="h-9 w-auto rounded border border-[var(--gray-4)] px-3 text-[var(--gray-12)] outline-none focus:border-[var(--accent-10)] focus:transition-all focus:duration-300"
+              className="h-8 w-auto rounded border border-[var(--gray-4)] px-3 text-sm text-[var(--gray-12)] outline-none focus:border-[var(--accent-10)] focus:transition-all focus:duration-300"
               aria-label="직업 선택"
             >
               <option value="">직업을 선택하세요</option>
@@ -166,7 +166,7 @@ export const SearchForm: React.FC<SearchFormProps> = ({
               onChange={onChangeEngrave}
               required
               disabled={!job}
-              className="h-9 w-auto rounded border border-[var(--gray-4)] px-3 text-[var(--gray-12)] outline-none focus:border-[var(--accent-10)] focus:transition-all focus:duration-300 disabled:bg-[var(--gray-1)]"
+              className="h-8 w-auto rounded border border-[var(--gray-4)] px-3 text-sm text-[var(--gray-12)] outline-none focus:border-[var(--accent-10)] focus:transition-all focus:duration-300 disabled:bg-[var(--gray-1)]"
               aria-label="직업 각인 선택"
             >
               <option value="">직업을 먼저 선택하세요</option>
@@ -189,7 +189,7 @@ export const SearchForm: React.FC<SearchFormProps> = ({
               type="number"
               value={minCombatPower}
               onChange={onChangeMinCP}
-              className="h-9 w-24 rounded border border-[var(--gray-4)] px-3 text-[var(--gray-12)] outline-none focus:border-[var(--accent-10)] focus:transition-all focus:duration-300"
+              className="h-8 w-24 rounded border border-[var(--gray-4)] px-3 text-sm text-[var(--gray-12)] outline-none focus:border-[var(--accent-10)] focus:transition-all focus:duration-300"
               placeholder="0"
               inputMode="numeric"
             />
@@ -207,7 +207,7 @@ export const SearchForm: React.FC<SearchFormProps> = ({
               type="number"
               value={maxCombatPower}
               onChange={onChangeMaxCP}
-              className="h-9 w-24 rounded border border-[var(--gray-4)] px-3 text-[var(--gray-12)] outline-none focus:border-[var(--accent-10)] focus:transition-all focus:duration-300"
+              className="h-8 w-24 rounded border border-[var(--gray-4)] px-3 text-sm text-[var(--gray-12)] outline-none focus:border-[var(--accent-10)] focus:transition-all focus:duration-300"
               placeholder="9999"
               inputMode="numeric"
             />
@@ -225,7 +225,7 @@ export const SearchForm: React.FC<SearchFormProps> = ({
               value={endRank}
               onChange={onChangeEndRank}
               required
-              className="h-9 w-auto rounded border border-[var(--gray-4)] px-3 text-[var(--gray-12)] outline-none focus:border-[var(--accent-10)] focus:transition-all focus:duration-300"
+              className="h-8 w-auto rounded border border-[var(--gray-4)] px-3 text-sm text-[var(--gray-12)] outline-none focus:border-[var(--accent-10)] focus:transition-all focus:duration-300"
               aria-label="분석 대상 수 선택"
             >
               <option value="10">상위 10명</option>
@@ -241,8 +241,8 @@ export const SearchForm: React.FC<SearchFormProps> = ({
               disabled={isAnalyzing || isWaiting}
               className={`${
                 isWaiting
-                  ? 'h-9 w-auto animate-pulse cursor-wait rounded border border-[var(--accent-10)] bg-[var(--accent-10)] px-6 text-white transition-all'
-                  : 'h-9 w-auto rounded border border-[var(--gray-8)] px-6 text-[var(--gray-12)] transition-all active:bg-[var(--accent-6)]'
+                  ? 'h-8 w-auto animate-pulse cursor-wait rounded border border-[var(--accent-10)] bg-[var(--accent-10)] px-6 text-sm text-white transition-all'
+                  : 'h-8 w-auto rounded border border-[var(--gray-8)] px-6 text-sm text-[var(--gray-12)] transition-all active:bg-[var(--accent-6)]'
               } disabled:cursor-not-allowed disabled:bg-[var(--gray-5)]`}
               aria-live="polite"
               aria-busy={isWaiting}

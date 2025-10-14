@@ -27,7 +27,7 @@ export const CoreCategorySelector = ({
   disabled: boolean;
 }) => (
   <div className="inline-flex min-w-0 flex-col gap-1">
-    <div className="text-xs font-semibold text-[var(--red-9)]">{title}</div>
+    <div className="text-sm font-semibold text-[var(--red-8)]">{title}</div>
     <div className="flex min-h-12 items-center rounded-md border border-dashed border-[var(--gray-7)] p-2">
       {cores.length > 0 ? (
         <div className="flex flex-wrap gap-2">
