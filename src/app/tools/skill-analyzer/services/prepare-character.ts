@@ -54,13 +54,23 @@ function buildSkillDetail(skill: any): [string, SkillDetail] | null {
     // JSON 파싱 실패 시 빈 객체 유지
   }
 
+  const bodyText = sanitizeHtml(skillTooltip.Element_005?.value);
+  const brIndex = bodyText.search(/<br.*?>/i);
+  const body_1 = brIndex !== -1 ? bodyText.substring(0, brIndex) : bodyText;
+  const body_2_string =
+    brIndex !== -1
+      ? bodyText.substring(brIndex + bodyText.match(/<br.*?>/i)![0].length)
+      : '';
+  const body_2 = body_2_string ? body_2_string.split(/<br.*?>/i) : [];
+
   const detail: SkillDetail = {
     icon: skill.Icon,
     level: skill.Level,
     tooltip: {
       header_1: sanitizeHtml(skillTooltip.Element_001?.value?.name),
       header_2: sanitizeHtml(skillTooltip.Element_001?.value?.level),
-      body: sanitizeHtml(skillTooltip.Element_005?.value),
+      body_1,
+      body_2,
     },
     tripods: (skill.Tripods || [])
       .filter((t: any) => t.IsSelected)
