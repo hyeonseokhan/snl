@@ -7,7 +7,7 @@
 
 import React, { Fragment, useMemo } from 'react';
 import {
-  SectionHeader,
+  Section,
   StatCard,
   RuneTooltip,
   TripodTooltip,
@@ -15,7 +15,6 @@ import {
 } from '../components';
 
 // === 타입 정의 =================================================================
-
 interface AnalysisResultsProps {
   results: any | null;
   selectedSkill: string | null;
@@ -127,7 +126,9 @@ export const AnalysisResults: React.FC<AnalysisResultsProps> = ({
                     ([tier, tripodList]: any) => (
                       <div key={tier}>
                         <h6
-                          className={`font-semibold ${tierColorMap[tier] ?? 'text-[var(--gray-11)]'}`}
+                          className={`font-semibold ${
+                            tierColorMap[tier] ?? 'text-[var(--gray-11)]'
+                          }`}
                         >
                           {tier}티어
                         </h6>
@@ -282,54 +283,41 @@ export const AnalysisResults: React.FC<AnalysisResultsProps> = ({
   // --- 렌더 --------------------------------------------------------------------
   return (
     <>
-      {/* 결과 요약 */}
-      <div className="block w-full flex-row border-t border-[var(--gray-5)] pt-3 md:flex">
-        <SectionHeader
-          title="분석 결과 요약"
-          description="분석된 데이터의 주요 통계입니다."
-        />
+      <Section
+        title="분석 결과 요약"
+        description="분석된 데이터의 주요 통계입니다."
+      >
         {summaryCards}
-      </div>
+      </Section>
 
-      {/* 스킬 사용 통계 */}
-      <div className="block w-full flex-row border-t border-[var(--gray-5)] pt-3 md:flex">
-        <SectionHeader
-          title="스킬 사용 통계"
-          description="랭커들의 스킬 채용률입니다."
-        />
-        <div className="w-full md:w-9/12">
-          <div className="w-full rounded-lg border border-dashed border-[var(--gray-8)] p-3">
-            <div className="flex border-b border-[var(--gray-5)] pb-3 text-sm text-[var(--gray-11)]">
-              <div className="flex-1 text-center">스킬명</div>
-              <div className="flex-1 text-center">사용 캐릭터 수</div>
-              <div className="flex-1 text-center">사용률</div>
-            </div>
-            {skillUsageRows}
+      <Section title="스킬 사용 통계" description="랭커들의 스킬 채용률입니다.">
+        <div className="w-full rounded-lg border border-dashed border-[var(--gray-8)] p-3">
+          <div className="flex border-b border-[var(--gray-5)] pb-3 text-sm text-[var(--gray-11)]">
+            <div className="flex-1 text-center">스킬명</div>
+            <div className="flex-1 text-center">사용 캐릭터 수</div>
+            <div className="flex-1 text-center">사용률</div>
           </div>
+          {skillUsageRows}
         </div>
-      </div>
+      </Section>
 
-      {/* 캐릭터 스킬 상세 */}
-      <div className="block w-full flex-row border-t border-[var(--gray-5)] pt-3 md:flex">
-        <SectionHeader
-          title="캐릭터 스킬 상세"
-          description="캐릭터별 스킬, 레벨, 트라이포드, 룬 정보입니다."
-        />
-        <div className="w-full md:w-9/12">
-          <div className="w-full rounded-lg border border-dashed border-[var(--gray-8)] p-3">
-            <div className="flex border-b border-[var(--gray-5)] pb-3 text-xs font-semibold text-[var(--gray-11)]">
-              <div className="w-1/5 text-center">캐릭터</div>
-              <div className="flex w-4/5">
-                <div className="w-3/12 text-center">스킬명</div>
-                <div className="w-2/12 text-center">레벨</div>
-                <div className="w-5/12 text-center">트라이포드</div>
-                <div className="w-2/12 text-center">룬</div>
-              </div>
+      <Section
+        title="캐릭터 스킬 상세"
+        description="캐릭터별 스킬, 레벨, 트라이포드, 룬 정보입니다."
+      >
+        <div className="w-full rounded-lg border border-dashed border-[var(--gray-8)] p-3">
+          <div className="flex border-b border-[var(--gray-5)] pb-3 text-xs font-semibold text-[var(--gray-11)]">
+            <div className="w-1/5 text-center">캐릭터</div>
+            <div className="flex w-4/5">
+              <div className="w-3/12 text-center">스킬명</div>
+              <div className="w-2/12 text-center">레벨</div>
+              <div className="w-5/12 text-center">트라이포드</div>
+              <div className="w-2/12 text-center">룬</div>
             </div>
-            {characterTable}
           </div>
+          {characterTable}
         </div>
-      </div>
+      </Section>
     </>
   );
 };

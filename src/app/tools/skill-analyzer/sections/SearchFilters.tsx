@@ -6,7 +6,7 @@
 'use client';
 
 import React, { useMemo } from 'react';
-import { SectionHeader, CoreCategorySelector } from '../components';
+import { Section, CoreCategorySelector } from '../components';
 import type { CoreMeta } from '../types';
 
 // === 타입 정의 =================================================================
@@ -85,22 +85,19 @@ export const SearchFilters: React.FC<SearchFiltersProps> = ({
   if (!showSection) return null;
 
   return (
-    <div className="block w-full flex-row border-t border-[var(--gray-5)] pb-3 pt-3 md:flex">
-      <SectionHeader
-        title="조건 상세"
-        description="사용 코어를 선택해 조건을 세부 설정합니다."
-      />
-      <div className="w-full md:w-9/12">
-        <div className="inline-flex w-fit max-w-full flex-col gap-3 self-start md:w-auto">
-          {hasCoreOptions ? (
-            categoryNodes
-          ) : (
-            <span className="text-sm text-[var(--gray-9)]" aria-live="polite">
-              직업 각인을 선택하면 코어가 표시됩니다.
-            </span>
-          )}
-        </div>
+    <Section
+      title="조건 상세"
+      description="사용 코어를 선택해 조건을 세부 설정합니다."
+    >
+      <div className="inline-flex w-fit max-w-full flex-col gap-3 self-start md:w-auto">
+        {hasCoreOptions ? (
+          categoryNodes
+        ) : (
+          <span className="text-sm text-[var(--gray-9)]" aria-live="polite">
+            직업 각인을 선택하면 코어가 표시됩니다.
+          </span>
+        )}
       </div>
-    </div>
+    </Section>
   );
 };

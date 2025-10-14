@@ -6,7 +6,7 @@
 'use client';
 
 import React, { useMemo } from 'react';
-import { SectionHeader } from '../components';
+import { Section } from '../components';
 
 // === 타입 정의 =================================================================
 
@@ -37,19 +37,16 @@ export const AnalysisLogs: React.FC<AnalysisLogsProps> = ({
 
   // --- 렌더 --------------------------------------------------------------------
   return (
-    <div className="block w-full flex-row border-t border-[var(--gray-5)] pt-3 md:flex">
-      <SectionHeader
-        title="분석 로그"
-        description="API 요청 및 데이터 처리 과정의 로그입니다."
-      />
-      <div className="w-full md:w-9/12">
-        <div
-          ref={logBoxRef}
-          className="max-h-60 overflow-y-auto rounded-lg bg-[var(--gray-1)] p-4 font-mono text-xs text-[var(--gray-11)]"
-        >
-          {logNodes}
-        </div>
+    <Section
+      title="분석 로그"
+      description="API 요청 및 데이터 처리 과정의 로그입니다."
+    >
+      <div
+        ref={logBoxRef}
+        className="max-h-60 overflow-y-auto rounded-lg bg-[var(--gray-1)] p-4 font-mono text-xs text-[var(--gray-11)]"
+      >
+        {logNodes}
       </div>
-    </div>
+    </Section>
   );
 };

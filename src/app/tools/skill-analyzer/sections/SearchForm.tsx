@@ -6,7 +6,7 @@
 'use client';
 
 import React, { useCallback, useMemo } from 'react';
-import { SectionHeader } from '../components';
+import { Section } from '../components';
 
 // === 타입 정의 =================================================================
 
@@ -123,13 +123,14 @@ export const SearchForm: React.FC<SearchFormProps> = ({
 
   // --- 렌더 --------------------------------------------------------------------
   return (
-    <form onSubmit={onSubmit} className="block w-full flex-row pb-3 md:flex">
-      <SectionHeader
-        title="검색 정보 입력"
-        description="직업, 각인, 대상 수 등을 설정합니다."
-      />
-
-      <div className="flex w-full flex-col gap-4 md:w-9/12">
+    <Section
+      as="form"
+      onSubmit={onSubmit}
+      title="검색 정보 입력"
+      description="직업, 각인, 대상 수 등을 설정합니다."
+      className="block w-full flex-row pb-3 md:flex"
+    >
+      <div className="flex w-full flex-col gap-4">
         {/* 1행: 직업/직업 각인 */}
         <div className="flex flex-wrap items-end gap-4">
           <div>
@@ -272,6 +273,6 @@ export const SearchForm: React.FC<SearchFormProps> = ({
           </div>
         )}
       </div>
-    </form>
+    </Section>
   );
 };
