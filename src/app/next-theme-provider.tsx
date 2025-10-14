@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useRef } from 'react';
+import { useState } from 'react';
 import { ThemeProvider, useTheme } from 'next-themes';
 import { Theme } from '@radix-ui/themes';
 import { useLocalStorage } from '../utils/use-local-storage';
@@ -10,7 +10,9 @@ import Color from 'colorjs.io';
 import { PortalRootContext } from './hooks/portal-root-context';
 
 export function NextThemeProvider({ children }) {
-  const portalRootRef = useRef<HTMLDivElement>(null);
+  const [portalRootNode, setPortalRootNode] = useState<HTMLDivElement | null>(
+    null,
+  );
   const { resolvedTheme, setTheme } = useTheme();
   const [lightAccentValue, setLightAccentValue] = useLocalStorage(
     'colors/light/accent',
@@ -69,8 +71,11 @@ export function NextThemeProvider({ children }) {
         }
         radius="medium"
       >
-        <PortalRootContext.Provider value={portalRootRef}>
-          <div ref={portalRootRef} style={{ position: 'relative', zIndex: 0 }}>
+        <PortalRootContext.Provider value={portalRootNode}>
+          <div
+            ref={setPortalRootNode}
+            style={{ position: 'relative', zIndex: 0 }}
+          >
             {children}
           </div>
         </PortalRootContext.Provider>

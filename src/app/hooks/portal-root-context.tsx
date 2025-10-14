@@ -6,8 +6,6 @@
  * - 역할: Floating UI의 Portal이 렌더링될 DOM 노드를 하위 컴포넌트에 제공합니다.
  */
 
-import { createContext, type RefObject } from 'react';
+import { createContext } from 'react';
 
-export const PortalRootContext = createContext<RefObject<HTMLElement> | null>(
-  null,
-);
+export const PortalRootContext = createContext<HTMLElement | null>(null);

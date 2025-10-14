@@ -19,7 +19,7 @@ import {
   useInteractions,
   FloatingPortal,
 } from '@floating-ui/react';
-import { useState, useMemo, cloneElement, useContext } from 'react'; // useContext 추가
+import { useState, useMemo, cloneElement, useContext } from 'react';
 import type { Placement } from '@floating-ui/react';
 import type { FC, ReactNode, ReactElement } from 'react';
 import { PortalRootContext } from '../../../../hooks/portal-root-context';
@@ -47,7 +47,7 @@ export const BaseTooltip: FC<BaseTooltipProps> = ({
   placement = 'top',
 }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const portalRootRef = useContext(PortalRootContext); // 컨텍스트 사용
+  const portalRootNode = useContext(PortalRootContext); // 컨텍스트에서 DOM 노드를 직접 가져옴
 
   // --- floating-ui 설정 ----------------------------------------------------
   const { refs, floatingStyles, context } = useFloating({
@@ -87,9 +87,9 @@ export const BaseTooltip: FC<BaseTooltipProps> = ({
   return (
     <>
       {trigger}
-      <FloatingPortal root={portalRootRef?.current}>
+      <FloatingPortal root={portalRootNode}>
         {' '}
-        {/* root prop 설정 */}
+        {/* root prop에 DOM 노드를 직접 전달 */}
         {isOpen && (
           <div
             ref={refs.setFloating}
