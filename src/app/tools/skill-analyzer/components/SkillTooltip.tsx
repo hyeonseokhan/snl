@@ -50,7 +50,7 @@ export const SkillTooltip: React.FC<SkillTooltipProps> = ({
       {/* 툴팁 카드 (hover) */}
       <div
         role="tooltip"
-        className="bg-[var(--gray-2)]/90 invisible absolute bottom-full left-1/2 z-50 w-[20rem] max-w-[80vw] -translate-x-1/2 -translate-y-2 rounded-xl border border-[var(--gray-6)] p-3 text-[var(--gray-12)] opacity-0 shadow-lg backdrop-blur transition-all duration-200 group-hover:pointer-events-auto group-hover:visible group-hover:opacity-100"
+        className="invisible absolute bottom-full left-1/2 z-50 w-[20rem] max-w-[80vw] -translate-x-1/2 -translate-y-2 rounded-xl border border-[var(--gray-6)] bg-[var(--gray-2)] p-3 text-[var(--gray-12)] opacity-0 shadow-lg transition-all duration-200 group-hover:pointer-events-auto group-hover:visible group-hover:opacity-100"
       >
         {/* 헤더: 좌측 스킬명(굵게), 우측 타입/분류 */}
         <div className="flex items-end justify-between gap-3">
