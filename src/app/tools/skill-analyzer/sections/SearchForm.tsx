@@ -128,7 +128,7 @@ export const SearchForm: React.FC<SearchFormProps> = ({
       onSubmit={onSubmit}
       title="검색 정보 입력"
       description="직업, 각인, 대상 수 등을 설정합니다."
-      className="block w-full flex-row pb-3 md:flex"
+      className="block w-full flex-row pb-3 xl:flex"
     >
       <div className="flex w-full flex-col gap-4">
         {/* 1행: 직업/직업 각인 */}

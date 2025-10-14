@@ -11,7 +11,7 @@ export default function ToolsLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const links = getFilteredLinks(['goldCalc', 'raidAuction']);
   return (
-    <div className="flex flex-col px-4 md:px-36">
+    <div className="flex flex-col px-4 xl:px-36">
       <div className={`flex flex-row py-4`}>
         {links.map((link, index) => {
           const isLast = index === links.length - 1;

@@ -91,7 +91,7 @@ export const AnalysisResults: React.FC<AnalysisResultsProps> = ({
         </div>
 
         {selectedSkill === row.skill_name && skillDetailStats && (
-          <div className="bg-[var(--gray-1)] p-4 text-xs">
+          <div className="bg-[var(--gray-2)] p-4 text-xs">
             <div className="mb-3 text-sm font-bold text-[var(--gray-12)]">
               세부 통계 (총 {skillDetailStats.total}명 중)
             </div>
@@ -235,7 +235,7 @@ export const AnalysisResults: React.FC<AnalysisResultsProps> = ({
                     <div className="w-5/12 p-2 text-center text-xs">
                       {Array.isArray(skillData.tripods) &&
                       skillData.tripods.length > 0 ? (
-                        <div className="flex flex-wrap items-center justify-center gap-1.5">
+                        <div className="flex flex-col items-center gap-1 xl:flex-row xl:flex-wrap xl:justify-center xl:gap-0.5">
                           {skillData.tripods.map((t: any, idx: number) => (
                             <TripodTooltip
                               key={`${skillName}-tripod-${idx}`}

@@ -14,7 +14,7 @@ export const SectionHeader = ({
   title: string;
   description: string;
 }) => (
-  <div className="flex w-full flex-col pb-4 md:w-3/12 md:gap-y-3 md:pb-0 md:pr-8">
+  <div className="flex w-full flex-col pb-4 xl:w-1/5 xl:gap-y-3 xl:pb-0 xl:pr-8">
     <div className="text-[var(--gray-12)]">{title}</div>
     <div className="text-sm text-[var(--gray-9)]">{description}</div>
   </div>

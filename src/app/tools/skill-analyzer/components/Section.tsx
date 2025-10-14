@@ -25,11 +25,11 @@ export const Section: React.FC<SectionProps> = ({
 }) => {
   return (
     <Component
-      className="block w-full flex-row border-t border-[var(--gray-5)] pt-3 md:flex"
+      className="block w-full flex-row border-t border-[var(--gray-5)] pt-3 xl:flex"
       {...props}
     >
       <SectionHeader title={title} description={description} />
-      <div className="w-full md:w-9/12">{children}</div>
+      <div className="w-full xl:w-9/12">{children}</div>
     </Component>
   );
 };
