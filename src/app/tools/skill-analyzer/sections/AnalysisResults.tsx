@@ -51,7 +51,6 @@ export const AnalysisResults: React.FC<AnalysisResultsProps> = ({
   // --- 결과 파생값(안전 값) -----------------------------------------------------
   const totalCharacters = results?.totalCharacters ?? 0;
   const keptCharactersLen = results?.keptCharacters?.length ?? 0;
-  const allRowsLen = results?.allRows?.length ?? 0;
   const skillUsageLen = results?.skillUsageRows?.length ?? 0;
 
   // --- 결과 요약 카드 -----------------------------------------------------------
@@ -60,11 +59,10 @@ export const AnalysisResults: React.FC<AnalysisResultsProps> = ({
       <div className="grid w-full grid-cols-2 gap-4 md:w-9/12 md:grid-cols-4">
         <StatCard label="분석대상 캐릭터" value={totalCharacters} />
         <StatCard label="조건 부합 캐릭터" value={keptCharactersLen} />
-        <StatCard label="추출된 트라이포드" value={allRowsLen} />
         <StatCard label="고유 스킬" value={skillUsageLen} />
       </div>
     ),
-    [totalCharacters, keptCharactersLen, allRowsLen, skillUsageLen],
+    [totalCharacters, keptCharactersLen, skillUsageLen],
   );
 
   // --- 스킬 사용 통계(행) -------------------------------------------------------

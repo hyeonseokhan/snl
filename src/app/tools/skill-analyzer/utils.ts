@@ -118,45 +118,6 @@ export function extractArkgridSlotNameSet(armory: any): Set<string> {
 }
 
 /**
- * 캐릭터의 스킬 정보에서 사용자가 선택한 트라이포드들만 추출하여 분석용 데이터 행으로 가공합니다.
- * @param {string} character - 캐릭터 이름
- * @param {any[]} skillsClean - 정리된 스킬 정보 배열
- * @returns {any[]} - 트라이포드 정보를 담은 데이터 행(row)의 배열
- */
-export function extractSelectedRows(
-  character: string,
-  skillsClean: any[],
-): any[] {
-  const rows: any[] = [];
-  if (!Array.isArray(skillsClean)) return rows;
-  for (const item of skillsClean) {
-    try {
-      const level = item.Level || 0;
-      if (typeof level !== 'number' || level <= 1) continue;
-      const skillName = cleanText(item.Name || '');
-      const rune = item.Rune || {};
-      const runeName = cleanText(rune.Name || '');
-      const tripods = item.Tripods || [];
-      for (const tp of tripods) {
-        if (tp?.IsSelected) {
-          rows.push({
-            character,
-            skill_name: skillName,
-            skill_level: level,
-            tripod_tier: tp.Tier,
-            tripod_name: cleanText(tp.Name || ''),
-            rune_name: runeName,
-          });
-        }
-      }
-    } catch (error: any) {
-      console.log(`트라이포드 추출 중 오류: ${error.message}`);
-    }
-  }
-  return rows;
-}
-
-/**
  * 캐릭터가 실제로 사용하는 스킬(레벨 1 초과)의 이름들을 집계하여 Set으로 반환합니다.
  * @param {any[]} skillsClean - 정리된 스킬 정보 배열
  * @returns {Set<string>} - 사용된 스킬 이름 Set

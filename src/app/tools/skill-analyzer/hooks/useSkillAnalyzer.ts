@@ -262,7 +262,7 @@ export function useSkillAnalyzer() {
           try {
             const armory = await fetchArmories(name, apiCallbacks);
             const prepared = prepareCharacterDataFromArmory(name, armory);
-            if (prepared.rows.length === 0) {
+            if (prepared.usedSkills.size === 0) {
               log(`[실패] ${name}님의 정보를 가져오지 못했습니다.`);
               return undefined;
             }
@@ -290,9 +290,7 @@ export function useSkillAnalyzer() {
 
       for (const item of validData) {
         log(
-          `[완료] ${String(item.rank).padStart(2, '0')}. ${item.name} - ${
-            item.rows.length
-          }개의 트라이포드 추출`,
+          `[완료] ${String(item.rank).padStart(2, '0')}. ${item.name} - ${item.usedSkills.size}개의 스킬 추출`,
         );
       }
 
@@ -390,12 +388,12 @@ export function useSkillAnalyzer() {
         const { name, data: armory } = armoryData;
         try {
           const preparedData = prepareCharacterDataFromArmory(name, armory);
-          if (preparedData.rows.length > 0) {
+          if (preparedData.usedSkills.size > 0) {
             prepared.push(preparedData);
             log(
               `[캐시] ${String(completed + 1).padStart(2, '0')}. ${name} - ${
-                preparedData.rows.length
-              }개의 트라이포드 추출`,
+                preparedData.usedSkills.size
+              }개의 스킬 추출`,
             );
           } else {
             log(`[실패] ${name}님의 정보가 캐시에 비어있습니다.`);
@@ -496,7 +494,6 @@ export function useSkillAnalyzer() {
     const normalizedCores = new Set(requiredCores.map(norm));
     const hasCoreFilter = normalizedCores.size > 0;
     const kept: string[] = [];
-    const allRows: any[] = []; // This is no longer used for skill details
     const skillUsageCounter = new Map<string, number>();
 
     for (const entry of preparedData) {
@@ -519,7 +516,6 @@ export function useSkillAnalyzer() {
       .sort((a, b) => b.characters - a.characters);
 
     setResults({
-      allRows,
       skillUsageRows,
       keptCharacters: kept,
       totalCharacters: totalRanked,

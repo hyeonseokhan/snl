@@ -7,7 +7,6 @@
 import {
   aggregateSkillUsageByCharacter,
   extractArkgridSlotNameSet,
-  extractSelectedRows,
 } from '../utils';
 import type { PreparedCharacterData, SkillDetail } from '../types';
 
@@ -115,7 +114,6 @@ export const prepareCharacterDataFromArmory = (
   if (!armory) {
     return {
       name,
-      rows: [],
       usedSkills: new Set(),
       arkgridSet: new Set(),
       skillDetails: {},
@@ -126,7 +124,6 @@ export const prepareCharacterDataFromArmory = (
   const skills = armory.ArmorySkills || [];
 
   // --- 화면에 필요한 1차 구조 생성 --------------------------------------------
-  const rows = extractSelectedRows(name, skills);
   const usedSkills = aggregateSkillUsageByCharacter(skills);
   const arkgridSet = extractArkgridSlotNameSet(armory);
 
@@ -141,5 +138,5 @@ export const prepareCharacterDataFromArmory = (
   }
 
   // --- 반환 --------------------------------------------------------------------
-  return { name, rows, usedSkills, arkgridSet, skillDetails };
+  return { name, usedSkills, arkgridSet, skillDetails };
 };
