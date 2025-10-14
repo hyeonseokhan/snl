@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import DOMPurify from 'dompurify';
+import { CoreTooltip } from './CoreTooltip';
 
 /**
  * 아크 그리드의 코어(해, 달, 별)를 선택하는 UI를 렌더링하는 컴포넌트입니다. (툴팁 지원)
@@ -14,7 +14,6 @@ import DOMPurify from 'dompurify';
  */
 export const CoreCategorySelector = ({
   title,
-  category,
   cores,
   selectedCore,
   onToggle,
@@ -32,38 +31,16 @@ export const CoreCategorySelector = ({
     <div className="flex min-h-12 items-center rounded-md border border-dashed border-[var(--gray-7)] p-2">
       {cores.length > 0 ? (
         <div className="flex flex-wrap gap-2">
-          {cores.map((core) => {
-            const sanitizedTooltip = DOMPurify.sanitize(core.tooltip);
-            return (
-              <div key={`${category}-${core.name}`} className="group relative">
-                <button
-                  type="button"
-                  onClick={() => onToggle(core.name)}
-                  disabled={disabled}
-                  className={`rounded-full border px-3 py-1 text-xs transition-all ${
-                    selectedCore === core.name
-                      ? 'border-[var(--accent-10)] bg-[var(--accent-9)] text-white'
-                      : 'border-[var(--gray-6)] bg-[var(--gray-1)] text-[var(--gray-11)] hover:bg-[var(--gray-4)]'
-                  } ${!disabled ? '' : 'cursor-not-allowed opacity-50'}`}
-                >
-                  {core.name}
-                </button>
-                <div
-                  role="tooltip"
-                  className="pointer-events-none invisible absolute bottom-full left-1/2 z-50 w-80 -translate-x-1/2 -translate-y-2 whitespace-pre-wrap rounded-xl border border-[var(--gray-6)] bg-[var(--gray-2)] p-3 text-[var(--gray-12)] opacity-0 shadow-lg transition-opacity duration-300 group-hover:visible group-hover:opacity-100"
-                >
-                  <div className="text-left text-[13px] font-bold text-[var(--gray-12)]">
-                    상세 효과
-                  </div>
-                  <div className="my-2 border-t border-[var(--gray-6)]" />
-                  <div
-                    className="text-left text-[11px] leading-5"
-                    dangerouslySetInnerHTML={{ __html: sanitizedTooltip }}
-                  />
-                </div>
-              </div>
-            );
-          })}
+          {cores.map((core) => (
+            <CoreTooltip
+              key={core.name}
+              name={core.name}
+              tooltip={core.tooltip}
+              isSelected={selectedCore === core.name}
+              disabled={disabled}
+              onClick={() => onToggle(core.name)}
+            />
+          ))}
         </div>
       ) : (
         <div className="text-xs text-[var(--gray-9)]">-</div>
