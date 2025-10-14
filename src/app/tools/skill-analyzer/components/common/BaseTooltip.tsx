@@ -19,9 +19,10 @@ import {
   useInteractions,
   FloatingPortal,
 } from '@floating-ui/react';
-import { useState, useMemo, cloneElement } from 'react';
+import { useState, useMemo, cloneElement, useContext } from 'react'; // useContext 추가
 import type { Placement } from '@floating-ui/react';
 import type { FC, ReactNode, ReactElement } from 'react';
+import { PortalRootContext } from '../../../../hooks/portal-root-context';
 
 // === 타입 정의 =================================================================
 export interface BaseTooltipProps {
@@ -36,9 +37,9 @@ export interface BaseTooltipProps {
 // === 컴포넌트 ==================================================================
 /**
  * floating-ui를 사용하여 동적으로 위치가 조절되는 범용 툴팁 컴포넌트입니다.
- * @param {ReactElement} children - 툴팁을 여는 트리거 엘리먼트입니다.
- * @param {ReactNode} content - 툴팁 내부에 표시될 콘텐츠입니다.
- * @param {Placement} [placement='top'] - 툴팁이 표시될 기본 위치입니다.
+ * @param children 툴팁을 여는 트리거 엘리먼트입니다.
+ * @param content 툴팁 내부에 표시될 콘텐츠입니다.
+ * @param placement 툴팁이 표시될 기본 위치입니다. (기본값: 'top')
  */
 export const BaseTooltip: FC<BaseTooltipProps> = ({
   children,
@@ -46,6 +47,7 @@ export const BaseTooltip: FC<BaseTooltipProps> = ({
   placement = 'top',
 }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const portalRootRef = useContext(PortalRootContext); // 컨텍스트 사용
 
   // --- floating-ui 설정 ----------------------------------------------------
   const { refs, floatingStyles, context } = useFloating({
@@ -85,7 +87,9 @@ export const BaseTooltip: FC<BaseTooltipProps> = ({
   return (
     <>
       {trigger}
-      <FloatingPortal>
+      <FloatingPortal root={portalRootRef?.current}>
+        {' '}
+        {/* root prop 설정 */}
         {isOpen && (
           <div
             ref={refs.setFloating}

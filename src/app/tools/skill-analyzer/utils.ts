@@ -143,7 +143,9 @@ export function aggregateSkillUsageByCharacter(
  * 옵션 객체를 툴팁 문자열로 변환합니다.
  * - 존재하는 키를 숫자 오름차순으로 정렬하여 "[키P] 설명" 포맷으로 나열합니다.
  */
-export function buildCoreTooltip(optionObj: Record<string, string> | undefined): string {
+export function buildCoreTooltip(
+  optionObj: Record<string, string> | undefined,
+): string {
   if (!optionObj) return '';
   const orderedKeys = Object.keys(optionObj).sort(
     (a, b) => Number(a) - Number(b),
