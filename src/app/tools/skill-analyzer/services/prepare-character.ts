@@ -29,7 +29,7 @@ function sanitizeHtml(html: string | undefined): string {
  * @returns SkillDetail 구조에 맞는 객체
  */
 function buildSkillDetail(skill: any): [string, SkillDetail] | null {
-  if (!skill || !skill.Name || skill.Level <= 1) {
+  if (!skill || !skill.Name || !skill.Rune) {
     return null;
   }
 
